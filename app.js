@@ -1,8 +1,9 @@
 const STORAGE_KEY = "appigreja_prototype_state_v1";
 const SESSION_KEY = "appigreja_prototype_session_v1";
+const CLOUD_INIT_KEY = "appigreja_cloud_initialized_v1";
 
-// Se usar o Firebase Realtime Database, cole a URL aqui (ex: "https://appigreja-default-rtdb.firebaseio.com")
-const CLOUD_DB_URL = "https://appigreja-1f504-default-rtdb.firebaseio.com/";
+// LINK DO SEU FIREBASE REALTIME DATABASE JÁ CONFIGURADO:
+const CLOUD_DB_URL = "https://appigreja-1f504-default-rtdb.firebaseio.com";
 
 const CHURCHES = {
   sede: { name: "Igreja Sede", pastor: "Bispo Wagner", pastorId: "bispo-wagner" },
@@ -13,40 +14,71 @@ const CHURCHES = {
 const ROLE_LABELS = {
   obreiro: "Obreiro",
   lideranca: "Liderança",
+  secretaria: "Secretaria",
   pastor: "Pastor",
   bispo: "Bispo",
   adm: "ADM",
 };
 
+// SUBCARGOS E FUNÇÕES MINISTERIAIS SOLICITADOS
+const SUBROLE_LABELS = {
+  nenhum: "Sem subcargo específico",
+  pastor_adm: "PASTOR ADM",
+  pastor_aux: "PASTOR AUX",
+  secretaria: "SECRETARIA",
+  lider_obreiro: "LÍDER OBREIRO",
+  lider_louvor_sede: "LÍDER LOUVOR SEDE",
+  lider_louvor_campineiro: "LÍDER LOUVOR CAMPINEIRO",
+  lider_louvor_mogi: "LÍDER LOUVOR MOGI GUAÇU",
+  lider_zaqueu: "LÍDER ZAQUEU",
+  lider_evangelismo_sede: "LÍDER EVANGELISMO SEDE",
+  lider_evangelismo_campineiro: "LÍDER EVANGELISMO CAMPINEIRO",
+  lider_evangelismo_mogi: "LÍDER EVANGELISMO MOGI GUAÇU",
+  lider_danca_sede: "LÍDER DANÇA SEDE",
+  lider_danca_campineiro: "LÍDER DANÇA CAMPINEIRO",
+  lider_danca_mogi: "LÍDER DANÇA MOGI GUAÇU",
+};
+
+const ALL_ROLES = ["obreiro", "lideranca", "secretaria", "pastor", "bispo", "adm"];
+
 const PAGE_PERMISSIONS = {
-  "dashboard.html": ["pastor", "bispo", "adm"],
-  "visitas.html": ["obreiro", "lideranca", "pastor", "bispo", "adm"],
-  "nova-visita.html": ["obreiro", "lideranca", "pastor", "bispo", "adm"],
-  "zaqueus.html": ["obreiro", "lideranca", "pastor", "bispo", "adm"],
-  "calendario.html": ["obreiro", "lideranca", "pastor", "bispo", "adm"],
-  "biblioteca.html": ["obreiro", "lideranca", "pastor", "bispo", "adm"],
-  "visao.html": ["lideranca", "pastor", "bispo", "adm"],
-  "notificacoes.html": ["obreiro", "lideranca", "pastor", "bispo", "adm"],
+  "dashboard.html": ["secretaria", "pastor", "bispo", "adm"],
+  "visitas.html": ALL_ROLES,
+  "nova-visita.html": ALL_ROLES,
+  "zaqueus.html": ALL_ROLES,
+  "calendario.html": ALL_ROLES,
+  "biblioteca.html": ALL_ROLES,
+  "visao.html": ["lideranca", "secretaria", "pastor", "bispo", "adm"],
+  "notificacoes.html": ALL_ROLES,
+  "perfil.html": ALL_ROLES,
+  "radio.html": ALL_ROLES,
 };
 
 const NAV_ITEMS = [
-  { href: "dashboard.html", icon: "D", label: "Dashboard & Cargos", roles: ["pastor", "bispo", "adm"] },
-  { href: "visitas.html", icon: "V", label: "Visitas realizadas", roles: ["obreiro", "lideranca", "pastor", "bispo", "adm"] },
-  { href: "nova-visita.html", icon: "+", label: "Nova visita", roles: ["obreiro", "lideranca", "pastor", "bispo", "adm"] },
-  { href: "zaqueus.html", icon: "Z", label: "Zaqueus", roles: ["obreiro", "lideranca", "pastor", "bispo", "adm"] },
-  { href: "calendario.html", icon: "C", label: "Calendário Igreja", roles: ["obreiro", "lideranca", "pastor", "bispo", "adm"] },
-  { href: "biblioteca.html", icon: "B", label: "Biblioteca", roles: ["obreiro", "lideranca", "pastor", "bispo", "adm"] },
-  { href: "visao.html", icon: "G", label: "Visão Geral", roles: ["lideranca", "pastor", "bispo", "adm"] },
-  { href: "notificacoes.html", icon: "N", label: "Notificações", roles: ["obreiro", "lideranca", "pastor", "bispo", "adm"] },
+  { href: "dashboard.html", icon: "D", label: "Dashboard & Cargos", roles: ["secretaria", "pastor", "bispo", "adm"] },
+  { href: "perfil.html", icon: "P", label: "Meu Perfil", roles: ALL_ROLES },
+  { href: "radio.html", icon: "R", label: "Rádio Ao Vivo", roles: ALL_ROLES },
+  { href: "visitas.html", icon: "V", label: "Visitas realizadas", roles: ALL_ROLES },
+  { href: "nova-visita.html", icon: "+", label: "Nova visita", roles: ALL_ROLES },
+  { href: "zaqueus.html", icon: "Z", label: "Zaqueus", roles: ALL_ROLES },
+  { href: "calendario.html", icon: "C", label: "Calendário Igreja", roles: ALL_ROLES },
+  { href: "biblioteca.html", icon: "B", label: "Biblioteca", roles: ALL_ROLES },
+  { href: "visao.html", icon: "G", label: "Visão Geral", roles: ["lideranca", "secretaria", "pastor", "bispo", "adm"] },
+  { href: "notificacoes.html", icon: "N", label: "Notificações", roles: ALL_ROLES },
 ];
 
 const MONTHS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun"];
 
 let appState = loadAppState();
 let currentUser = null;
+let micStream = null;
+let micRecorderInterval = null;
+let isListeningRadio = false;
+let lastPlayedChunkId = 0;
 
 function emptyState() {
   return {
+    churchLogo: "",
     users: [],
     visits: [],
     zaqueus: [],
@@ -54,6 +86,15 @@ function emptyState() {
     libraryItems: [],
     calendarEvents: [],
     notifications: [],
+    radioLive: {
+      active: false,
+      title: "",
+      speakerName: "",
+      speakerChurch: "",
+      streamUrl: "",
+      updatedAt: 0,
+    },
+    radioMessages: [],
   };
 }
 
@@ -67,6 +108,7 @@ function normalizeStateData(raw) {
   const base = emptyState();
   const parsed = raw || {};
   const state = {
+    churchLogo: parsed.churchLogo || "",
     users: Array.isArray(parsed.users) ? parsed.users : base.users,
     visits: Array.isArray(parsed.visits) ? parsed.visits : base.visits,
     zaqueus: Array.isArray(parsed.zaqueus) ? parsed.zaqueus : base.zaqueus,
@@ -74,22 +116,33 @@ function normalizeStateData(raw) {
     libraryItems: Array.isArray(parsed.libraryItems) ? parsed.libraryItems : base.libraryItems,
     calendarEvents: Array.isArray(parsed.calendarEvents) ? parsed.calendarEvents : base.calendarEvents,
     notifications: Array.isArray(parsed.notifications) ? parsed.notifications : base.notifications,
+    radioLive: parsed.radioLive && typeof parsed.radioLive === "object" ? { ...base.radioLive, ...parsed.radioLive } : base.radioLive,
+    radioMessages: Array.isArray(parsed.radioMessages) ? parsed.radioMessages : base.radioMessages,
   };
 
-  state.users.forEach((u) => {
+  state.users.forEach((u, index) => {
     u.churchId = normalizeChurchId(u.churchId);
     u.church = CHURCHES[u.churchId].name;
     u.pastor = CHURCHES[u.churchId].pastor;
     u.pastorId = CHURCHES[u.churchId].pastorId;
-    if (!ROLE_LABELS[u.roleId]) {
-      u.roleId = "obreiro";
-    }
+    if (!ROLE_LABELS[u.roleId]) u.roleId = "obreiro";
     u.role = ROLE_LABELS[u.roleId];
+    if (!u.subRoleId || !SUBROLE_LABELS[u.subRoleId]) u.subRoleId = "nenhum";
+    u.subRole = SUBROLE_LABELS[u.subRoleId];
+    u.canBroadcast = Boolean(u.canBroadcast || u.roleId === "adm" || u.subRoleId === "pastor_adm");
+    u.photoUrl = u.photoUrl || "";
+    u.memberCard = u.memberCard || `IGR-${String(index + 1).padStart(4, "0")}`;
+    u.cpf = u.cpf || "";
+    u.birthDate = u.birthDate || "";
+    u.phone = u.phone || "";
+    u.baptismDate = u.baptismDate || "";
+    u.address = u.address || "";
   });
 
   if (state.users.length > 0 && !state.users.some((u) => u.roleId === "adm")) {
     state.users[0].roleId = "adm";
     state.users[0].role = ROLE_LABELS.adm;
+    state.users[0].canBroadcast = true;
   }
 
   state.visits.forEach((v) => {
@@ -102,9 +155,9 @@ function normalizeStateData(raw) {
   return state;
 }
 
-function getCloudEndpoint() {
+function getCloudEndpoint(node = "appigreja_state") {
   const cleanUrl = String(CLOUD_DB_URL || "").trim().replace(/\/+$/, "");
-  return cleanUrl ? `${cleanUrl}/appigreja_state.json` : "";
+  return cleanUrl ? `${cleanUrl}/${node}.json` : "";
 }
 
 function loadAppState() {
@@ -121,7 +174,7 @@ function loadAppState() {
 }
 
 async function syncFromCloud() {
-  const endpoint = getCloudEndpoint();
+  const endpoint = getCloudEndpoint("appigreja_state");
   if (!endpoint) return;
   try {
     const response = await fetch(endpoint, { cache: "no-store" });
@@ -129,9 +182,9 @@ async function syncFromCloud() {
     const cloudData = await response.json();
 
     if (cloudData && typeof cloudData === "object") {
-      // O banco na nuvem possui dados: sincroniza o navegador com a nuvem
       appState = normalizeStateData(cloudData);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+      localStorage.setItem(CLOUD_INIT_KEY, "true");
       const savedUserId = localStorage.getItem(SESSION_KEY);
       if (savedUserId) {
         currentUser = appState.users.find((u) => u.id === savedUserId) || null;
@@ -144,13 +197,19 @@ async function syncFromCloud() {
         renderAll();
       }
     } else if (cloudData === null) {
-      // O banco na nuvem foi apagado: limpa o cache local para não ressuscitar registros apagados
-      appState = emptyState();
-      localStorage.removeItem(STORAGE_KEY);
-      localStorage.removeItem(SESSION_KEY);
-      currentUser = null;
-      if (getCurrentPage() !== "index.html") {
-        window.location.replace("index.html");
+      const wasInitialized = localStorage.getItem(CLOUD_INIT_KEY) === "true";
+      if (!wasInitialized && appState.users.length > 0) {
+        // Primeira conexão com o Firebase: sobe os cadastros locais existentes para o banco
+        await saveAppState();
+      } else if (wasInitialized) {
+        // O banco foi apagado lá no painel do Firebase: limpa o cache local para não ressuscitar
+        appState = emptyState();
+        localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem(SESSION_KEY);
+        currentUser = null;
+        if (getCurrentPage() !== "index.html") {
+          window.location.replace("index.html");
+        }
       }
     }
   } catch (err) {
@@ -160,27 +219,32 @@ async function syncFromCloud() {
 
 async function saveAppState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
-  const endpoint = getCloudEndpoint();
+  const endpoint = getCloudEndpoint("appigreja_state");
   if (!endpoint) return;
   try {
-    await fetch(endpoint, {
+    const response = await fetch(endpoint, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(appState),
     });
+    if (response.ok) {
+      localStorage.setItem(CLOUD_INIT_KEY, "true");
+    } else {
+      console.error("Erro ao gravar no Firebase:", response.status);
+    }
   } catch (err) {
     console.warn("Salvo localmente:", err);
   }
 }
 
 async function resetEntireDatabase() {
-  if (!confirm("ATENÇÃO: Isso vai apagar TODOS os usuários, visitas, Zaqueus, eventos e notificações deste aparelho e da nuvem. Deseja zerar tudo?")) {
+  if (!confirm("ATENÇÃO: Isso vai apagar TODOS os usuários, visitas, Zaqueus, eventos e notificações deste aparelho e do Firebase. Deseja zerar tudo?")) {
     return;
   }
   appState = emptyState();
   localStorage.removeItem(STORAGE_KEY);
   localStorage.removeItem(SESSION_KEY);
-  const endpoint = getCloudEndpoint();
+  const endpoint = getCloudEndpoint("appigreja_state");
   if (endpoint) {
     try {
       await fetch(endpoint, { method: "DELETE" });
@@ -190,6 +254,66 @@ async function resetEntireDatabase() {
   }
   currentUser = null;
   window.location.replace("index.html");
+}
+
+// Redimensiona e comprime imagens (Foto de Perfil e Logo da Igreja) para salvar rápido no Firebase
+function compressImageFile(file, maxSize = 240) {
+  return new Promise((resolve) => {
+    if (!file) {
+      resolve("");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        let width = img.width;
+        let height = img.height;
+        if (width > height) {
+          if (width > maxSize) {
+            height = Math.round((height * maxSize) / width);
+            width = maxSize;
+          }
+        } else if (height > maxSize) {
+          width = Math.round((width * maxSize) / height);
+          height = maxSize;
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", 0.82));
+      };
+      img.onerror = () => resolve("");
+      img.src = String(e.target.result || "");
+    };
+    reader.onerror = () => resolve("");
+    reader.readAsDataURL(file);
+  });
+}
+
+function getLogoHtml() {
+  const customLogo = appState.churchLogo;
+  if (customLogo) {
+    return `<img src="${customLogo}" alt="Logo da Igreja" style="width:100%; height:100%; object-fit:cover; border-radius:var(--radius);" />`;
+  }
+  return `<img src="logo.png" alt="Logo" style="width:100%; height:100%; object-fit:cover; border-radius:var(--radius);" onerror="this.outerHTML='AI'" />`;
+}
+
+function applyChurchLogoEverywhere() {
+  document.querySelectorAll(".brand-mark").forEach((el) => {
+    el.innerHTML = getLogoHtml();
+  });
+  if (appState.churchLogo) {
+    let iconLink = document.querySelector('link[rel="icon"]');
+    if (!iconLink) {
+      iconLink = document.createElement("link");
+      iconLink.rel = "icon";
+      document.head.appendChild(iconLink);
+    }
+    iconLink.href = appState.churchLogo;
+  }
 }
 
 function injectCriticalFixesCss() {
@@ -207,8 +331,8 @@ function injectCriticalFixesCss() {
     }
     .user-role-row {
       display: grid;
-      grid-template-columns: minmax(180px, 1.2fr) minmax(140px, 1fr) minmax(180px, 1fr) auto;
-      gap: 12px;
+      grid-template-columns: minmax(190px, 1.3fr) minmax(130px, 0.9fr) minmax(170px, 1.1fr) minmax(160px, 1fr) auto;
+      gap: 10px;
       align-items: center;
       padding: 12px;
       border: 1px solid var(--line);
@@ -227,7 +351,29 @@ function injectCriticalFixesCss() {
       background: var(--red) !important;
       color: #ffffff !important;
     }
-    @media (max-width: 820px) {
+    .live-banner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 16px;
+      margin-bottom: 18px;
+      border-radius: var(--radius);
+      background: linear-gradient(90deg, #b33a30, #d9534f);
+      color: #ffffff;
+      font-weight: 800;
+      box-shadow: 0 8px 20px rgba(179, 58, 48, 0.25);
+    }
+    .member-badge-card {
+      padding: 18px;
+      border-radius: 12px;
+      background: linear-gradient(145deg, #18342f, #2f6f5e);
+      color: #ffffff;
+      display: grid;
+      gap: 14px;
+      box-shadow: var(--shadow);
+    }
+    @media (max-width: 980px) {
       .user-role-row {
         grid-template-columns: 1fr;
       }
@@ -242,6 +388,12 @@ function injectPwaTags() {
     link.rel = "manifest";
     link.href = "manifest.json";
     document.head.appendChild(link);
+  }
+  if (!document.querySelector('link[rel="apple-touch-icon"]')) {
+    const appleIcon = document.createElement("link");
+    appleIcon.rel = "apple-touch-icon";
+    appleIcon.href = appState.churchLogo || "logo.png";
+    document.head.appendChild(appleIcon);
   }
   if (!document.querySelector('meta[name="theme-color"]')) {
     const meta = document.createElement("meta");
@@ -258,7 +410,7 @@ function getCurrentPage() {
 
 function getHomePageForUser(user) {
   if (!user) return "index.html";
-  return ["pastor", "bispo", "adm"].includes(user.roleId) ? "dashboard.html" : "visitas.html";
+  return ["secretaria", "pastor", "bispo", "adm"].includes(user.roleId) ? "dashboard.html" : "visitas.html";
 }
 
 function normalizeEmail(value) {
@@ -321,6 +473,7 @@ function formatDate(value) {
   if (!value) return "";
   const [datePart, timePart] = String(value).split("T");
   const [year, month, day] = datePart.split("-");
+  if (!year || !month || !day) return String(value);
   const time = timePart ? ` às ${timePart}` : "";
   return `${day}/${month}/${year}${time}`;
 }
@@ -341,24 +494,52 @@ function getInitials(name) {
     .toUpperCase();
 }
 
+function getAvatarHtml(user, size = 38) {
+  if (user?.photoUrl) {
+    return `<img src="${user.photoUrl}" alt="${escapeHtml(user.name)}" style="width:${size}px; height:${size}px; border-radius:50%; object-fit:cover; flex:0 0 ${size}px;" />`;
+  }
+  return `<span class="avatar" style="width:${size}px; height:${size}px; flex-basis:${size}px;">${escapeHtml(getInitials(user?.name))}</span>`;
+}
+
+// Regras de Permissão e Privacidade
 function isAdmin() {
-  return ["adm", "bispo", "pastor"].includes(currentUser?.roleId);
+  return ["adm", "bispo", "pastor", "secretaria"].includes(currentUser?.roleId);
+}
+
+// SOMENTE ADM, SECRETARIA e PASTOR ADM podem ver as fichas de membros (CPF, endereço, carteira) de todos
+function canViewSecretariaData() {
+  if (!currentUser) return false;
+  return (
+    currentUser.roleId === "adm" ||
+    currentUser.roleId === "secretaria" ||
+    currentUser.subRoleId === "secretaria" ||
+    currentUser.subRoleId === "pastor_adm"
+  );
 }
 
 function canManageRoles() {
-  return ["adm", "bispo", "pastor"].includes(currentUser?.roleId);
+  return ["adm", "bispo", "pastor", "secretaria"].includes(currentUser?.roleId);
+}
+
+function canBroadcastRadio() {
+  if (!currentUser) return false;
+  return Boolean(
+    currentUser.roleId === "adm" ||
+      currentUser.subRoleId === "pastor_adm" ||
+      currentUser.canBroadcast
+  );
 }
 
 function hasGlobalScope() {
-  return ["adm", "bispo"].includes(currentUser?.roleId);
+  return ["adm", "bispo", "secretaria"].includes(currentUser?.roleId) || currentUser?.subRoleId === "pastor_adm";
 }
 
 function canManageZaqueu() {
-  return ["lideranca", "pastor", "bispo", "adm"].includes(currentUser?.roleId);
+  return ["lideranca", "pastor", "bispo", "adm"].includes(currentUser?.roleId) || currentUser?.subRoleId === "lider_zaqueu";
 }
 
 function canViewAllVisits() {
-  return ["lideranca", "pastor", "bispo", "adm"].includes(currentUser?.roleId);
+  return ["lideranca", "secretaria", "pastor", "bispo", "adm"].includes(currentUser?.roleId);
 }
 
 function getVisibleVisits() {
@@ -414,7 +595,7 @@ function injectSharedShell() {
   if (!shell || !main || !currentUser) return;
 
   shell.querySelectorAll(".sidebar").forEach((el) => el.remove());
-  main.querySelectorAll(".topbar").forEach((el) => el.remove());
+  main.querySelectorAll(".topbar, .live-banner").forEach((el) => el.remove());
   document.querySelectorAll(".adm-chat, #adm-drawer-toggle").forEach((el) => el.remove());
 
   const currentPage = getCurrentPage();
@@ -424,19 +605,25 @@ function injectSharedShell() {
     .filter((item) => item.roles.includes(currentUser.roleId))
     .map((item) => {
       const active = item.href === currentPage ? "active" : "";
+      const liveDot = item.href === "radio.html" && appState.radioLive?.active ? " 🔴" : "";
       return `
         <a class="nav-item ${active}" href="${item.href}">
           <span class="icon" aria-hidden="true">${item.icon}</span>
-          ${escapeHtml(item.label)}
+          ${escapeHtml(item.label)}${liveDot}
         </a>
       `;
     })
     .join("");
 
+  const subRoleDisplay =
+    currentUser.subRoleId && currentUser.subRoleId !== "nenhum"
+      ? ` • ${SUBROLE_LABELS[currentUser.subRoleId]}`
+      : "";
+
   const sidebarHtml = `
     <aside class="sidebar" aria-label="Navegação principal">
       <div class="brand">
-        <div class="brand-mark" aria-hidden="true">AI</div>
+        <div class="brand-mark" aria-hidden="true">${getLogoHtml()}</div>
         <div>
           <strong>APPIGREJA</strong>
           <span>Cuidado e Zaqueus</span>
@@ -444,11 +631,13 @@ function injectSharedShell() {
       </div>
       <nav class="nav-list">${navLinksHtml}</nav>
       <div class="profile-card">
-        <span class="avatar" id="profile-avatar" aria-hidden="true">${escapeHtml(getInitials(currentUser.name))}</span>
-        <div>
-          <strong id="profile-name">${escapeHtml(currentUser.name)}</strong>
-          <span id="profile-role">${escapeHtml((ROLE_LABELS[currentUser.roleId] || currentUser.role) + " - " + currentUser.church)}</span>
-        </div>
+        <a href="perfil.html" title="Editar Meu Perfil" style="display:flex; align-items:center; gap:10px; min-width:0; flex:1;">
+          ${getAvatarHtml(currentUser, 38)}
+          <div style="min-width:0;">
+            <strong id="profile-name">${escapeHtml(currentUser.name)}</strong>
+            <span id="profile-role">${escapeHtml((ROLE_LABELS[currentUser.roleId] || currentUser.role) + subRoleDisplay)}</span>
+          </div>
+        </a>
         <button class="profile-logout" type="button" id="logout-button">Sair</button>
       </div>
     </aside>
@@ -457,20 +646,28 @@ function injectSharedShell() {
   const promoteSelfBtn =
     currentUser.roleId !== "adm"
       ? `<button class="secondary-button" type="button" id="promote-self-adm" title="Ativar perfil ADM para testar na faculdade">Virar ADM (Teste)</button>`
-      : `<a class="secondary-button" href="dashboard.html#gestao-cargos">Gerenciar Cargos (${appState.users.length})</a>`;
+      : `<a class="secondary-button" href="perfil.html#secretaria-members-panel">Fichas da Secretaria (${appState.users.length})</a>`;
+
+  const liveBannerHtml =
+    appState.radioLive?.active && currentPage !== "radio.html"
+      ? `
+        <div class="live-banner">
+          <span>🔴 RÁDIO AO VIVO AGORA: ${escapeHtml(appState.radioLive.title || "Transmissão em andamento")} (${escapeHtml(appState.radioLive.speakerName)})</span>
+          <a class="secondary-button" href="radio.html" style="padding: 4px 12px; min-height: 30px;">Ouvir Agora</a>
+        </div>
+      `
+      : "";
 
   const topbarHtml = `
+    ${liveBannerHtml}
     <header class="topbar">
       <div>
-        <p class="eyebrow">Perfil: ${escapeHtml(ROLE_LABELS[currentUser.roleId])} | ${escapeHtml(currentUser.church)} (${escapeHtml(currentUser.pastor)})</p>
+        <p class="eyebrow">${escapeHtml(ROLE_LABELS[currentUser.roleId])}${escapeHtml(subRoleDisplay)} | ${escapeHtml(currentUser.church)} (${escapeHtml(currentUser.pastor)})</p>
         <h1 id="screen-title">${escapeHtml(pageTitle)}</h1>
       </div>
       <div class="topbar-actions">
         ${promoteSelfBtn}
-        <label class="search">
-          <span aria-hidden="true">B</span>
-          <input id="global-search" type="search" placeholder="Buscar visitante ou visitado" />
-        </label>
+        <a class="secondary-button" href="perfil.html">Meu Perfil</a>
         <a class="ghost-button" href="nova-visita.html">Nova visita</a>
       </div>
     </header>
@@ -479,7 +676,7 @@ function injectSharedShell() {
   shell.insertAdjacentHTML("afterbegin", sidebarHtml);
   main.insertAdjacentHTML("afterbegin", topbarHtml);
 
-  // 1. PAINEL DE PESSOAS REGISTRADAS, CARGOS E BOTÃO DE ZERAR BANCO NO DASHBOARD E VISÃO GERAL
+  // 1. PAINEL DE PESSOAS REGISTRADAS, SUBCARGOS, LOGO E RÁDIO NO DASHBOARD E VISÃO GERAL
   const dashboardScreen = document.querySelector("#dashboard") || document.querySelector("#visao");
   if (dashboardScreen && canManageRoles() && !document.querySelector("#gestao-cargos")) {
     const heading = dashboardScreen.querySelector(".section-heading");
@@ -487,24 +684,33 @@ function injectSharedShell() {
       <section class="panel wide inline-admin-panel" id="gestao-cargos">
         <div class="panel-header">
           <div>
-            <p class="eyebrow">Administração de Acessos e Hierarquia</p>
+            <p class="eyebrow">Administração Geral, Subcargos, Rádio e Logo</p>
             <h3>Pessoas Registradas no Sistema (<span id="registered-users-count">0</span>)</h3>
           </div>
           <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-            <span class="status-pill" id="role-save-feedback">Altere o cargo, igreja ou exclua abaixo</span>
-            <button class="secondary-button danger-btn" type="button" id="reset-db-btn">Zerar Tudo (Limpar Banco)</button>
+            <label class="secondary-button" style="cursor: pointer; padding: 6px 12px; min-height: 32px; font-size: 12px;">
+              🖼️ Trocar Logo do App
+              <input type="file" id="upload-church-logo-input" accept="image/*" style="display: none;" />
+            </label>
+            <a class="secondary-button" href="perfil.html#secretaria-members-panel" style="padding: 6px 12px; min-height: 32px; font-size: 12px;">
+              🪪 Ver Fichas / Carteiras (Secretaria)
+            </a>
+            <button class="secondary-button danger-btn" type="button" id="reset-db-btn">Zerar Tudo</button>
           </div>
         </div>
+        <p style="margin: 6px 0 12px; font-size: 13px; color: var(--muted);" id="role-save-feedback">
+          Defina abaixo o Cargo Principal, o Subcargo/Função Ministerial, a Igreja e quem pode transmitir na Rádio Ao Vivo:
+        </p>
 
         <div class="visit-list" id="page-users-list" style="margin-top: 12px; margin-bottom: 18px;"></div>
 
         <details style="border-top: 1px solid var(--line); padding-top: 14px;">
-          <summary style="cursor: pointer; font-weight: 800; color: var(--green-dark);">+ Cadastrar Nova Pessoa e Definir Cargo Diretamente</summary>
+          <summary style="cursor: pointer; font-weight: 800; color: var(--green-dark);">+ Cadastrar Nova Pessoa com Cargo e Subcargo</summary>
           <form class="stack-form" id="admin-add-user-form" style="margin-top: 12px;">
             <div class="form-grid">
               <label>
                 Nome completo
-                <input name="name" type="text" placeholder="Nome do obreiro, líder ou pastor" required />
+                <input name="name" type="text" placeholder="Nome completo" required />
               </label>
               <label>
                 E-mail único
@@ -523,19 +729,25 @@ function injectSharedShell() {
                 </select>
               </label>
               <label>
-                Cargo / Nível de Hierarquia
+                Nível de Acesso Principal
                 <select name="roleId" required>
-                  <option value="obreiro">Obreiro</option>
-                  <option value="lideranca">Liderança</option>
-                  <option value="pastor">Pastor</option>
-                  <option value="bispo">Bispo</option>
-                  <option value="adm">ADM</option>
+                  ${Object.entries(ROLE_LABELS)
+                    .map(([k, v]) => `<option value="${k}">${v}</option>`)
+                    .join("")}
+                </select>
+              </label>
+              <label>
+                Subcargo / Função Ministerial
+                <select name="subRoleId">
+                  ${Object.entries(SUBROLE_LABELS)
+                    .map(([k, v]) => `<option value="${k}">${v}</option>`)
+                    .join("")}
                 </select>
               </label>
             </div>
             <div class="form-actions">
               <span id="admin-add-user-msg" style="font-weight: 700; color: var(--green);"></span>
-              <button class="primary-button" type="submit">Cadastrar Pessoa com Cargo</button>
+              <button class="primary-button" type="submit">Cadastrar Pessoa</button>
             </div>
           </form>
         </details>
@@ -573,7 +785,7 @@ function injectSharedShell() {
                 <option value="obreiro">Obreiros</option>
                 <option value="lideranca">Liderança</option>
                 <option value="pastor">Pastores e Bispo</option>
-                <option value="adm">Administração</option>
+                <option value="adm">Administração e Secretaria</option>
               </select>
             </label>
           </div>
@@ -707,28 +919,47 @@ function buildUserRoleCardHtml(u) {
   const isSelf = u.id === currentUser?.id;
   return `
     <div class="user-role-row">
-      <div>
-        <strong style="font-size: 16px;">${escapeHtml(u.name)} ${isSelf ? "(Sua Conta)" : ""}</strong>
-        <small style="display:block; color: var(--muted);">E-mail único: ${escapeHtml(u.login)}</small>
+      <div style="display: flex; align-items: center; gap: 10px; min-width: 0;">
+        ${getAvatarHtml(u, 42)}
+        <div style="min-width: 0;">
+          <strong style="font-size: 15px; display: block;">${escapeHtml(u.name)} ${isSelf ? "(Você)" : ""}</strong>
+          <small style="display:block; color: var(--muted);">E-mail: ${escapeHtml(u.login)}</small>
+          <small style="display:block; color: var(--teal); font-weight: 700;">Carteira: ${escapeHtml(u.memberCard || "Não informada")}</small>
+        </div>
       </div>
-      <label style="font-size: 12px; color: var(--muted); font-weight: 700; display: grid; gap: 4px;">
-        Cargo / Hierarquia
+
+      <label style="font-size: 11px; color: var(--muted); font-weight: 700; display: grid; gap: 4px;">
+        Cargo Principal
         <select class="user-role-select" data-user-id="${escapeHtml(u.id)}">
           ${Object.entries(ROLE_LABELS)
             .map(([roleKey, label]) => `<option value="${roleKey}" ${u.roleId === roleKey ? "selected" : ""}>${label}</option>`)
             .join("")}
         </select>
       </label>
-      <label style="font-size: 12px; color: var(--muted); font-weight: 700; display: grid; gap: 4px;">
-        Igreja Vinculada
-        <select class="user-church-select" data-user-id="${escapeHtml(u.id)}">
-          ${Object.entries(CHURCHES)
-            .map(([chKey, chObj]) => `<option value="${chKey}" ${u.churchId === chKey ? "selected" : ""}>${chObj.name} (${chObj.pastor})</option>`)
+
+      <label style="font-size: 11px; color: var(--muted); font-weight: 700; display: grid; gap: 4px;">
+        Subcargo / Função
+        <select class="user-subrole-select" data-user-id="${escapeHtml(u.id)}">
+          ${Object.entries(SUBROLE_LABELS)
+            .map(([subKey, label]) => `<option value="${subKey}" ${(u.subRoleId || "nenhum") === subKey ? "selected" : ""}>${label}</option>`)
             .join("")}
         </select>
       </label>
+
+      <label style="font-size: 11px; color: var(--muted); font-weight: 700; display: grid; gap: 4px;">
+        Igreja Vinculada
+        <select class="user-church-select" data-user-id="${escapeHtml(u.id)}">
+          ${Object.entries(CHURCHES)
+            .map(([chKey, chObj]) => `<option value="${chKey}" ${u.churchId === chKey ? "selected" : ""}>${chObj.name}</option>`)
+            .join("")}
+        </select>
+      </label>
+
       <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-        <span class="tag">${escapeHtml(ROLE_LABELS[u.roleId] || u.role)}</span>
+        <label style="display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 800; color: var(--green-dark); cursor: pointer;">
+          <input type="checkbox" class="user-radio-check" data-user-id="${escapeHtml(u.id)}" style="min-height: 18px; width: 18px;" ${u.canBroadcast ? "checked" : ""} />
+          🎙️ Rádio
+        </label>
         <button class="secondary-button danger-btn delete-user-btn" type="button" data-user-id="${escapeHtml(u.id)}">
           Excluir
         </button>
@@ -746,6 +977,7 @@ function wireUserRoleSelects(rootElement) {
       if (!targetUser) return;
       targetUser.roleId = select.value;
       targetUser.role = ROLE_LABELS[select.value] || "Obreiro";
+      if (targetUser.roleId === "adm") targetUser.canBroadcast = true;
       await saveAppState();
       const feedback = document.querySelector("#role-save-feedback");
       if (feedback) feedback.textContent = `Cargo de ${targetUser.name} salvo como ${targetUser.role}!`;
@@ -754,6 +986,20 @@ function wireUserRoleSelects(rootElement) {
       } else {
         renderAll();
       }
+    });
+  });
+
+  rootElement.querySelectorAll(".user-subrole-select").forEach((select) => {
+    select.addEventListener("change", async () => {
+      const targetUser = appState.users.find((u) => u.id === select.dataset.userId);
+      if (!targetUser) return;
+      targetUser.subRoleId = select.value;
+      targetUser.subRole = SUBROLE_LABELS[select.value] || "Sem subcargo específico";
+      if (targetUser.subRoleId === "pastor_adm") targetUser.canBroadcast = true;
+      await saveAppState();
+      const feedback = document.querySelector("#role-save-feedback");
+      if (feedback) feedback.textContent = `Subcargo de ${targetUser.name} salvo como ${targetUser.subRole}!`;
+      renderAll();
     });
   });
 
@@ -769,10 +1015,21 @@ function wireUserRoleSelects(rootElement) {
       await saveAppState();
       const feedback = document.querySelector("#role-save-feedback");
       if (feedback) feedback.textContent = `Igreja de ${targetUser.name} alterada para ${ch.name}!`;
-      if (targetUser.id === currentUser.id) {
-        window.location.reload();
-      } else {
-        renderAll();
+      renderAll();
+    });
+  });
+
+  rootElement.querySelectorAll(".user-radio-check").forEach((checkbox) => {
+    checkbox.addEventListener("change", async () => {
+      const targetUser = appState.users.find((u) => u.id === checkbox.dataset.userId);
+      if (!targetUser) return;
+      targetUser.canBroadcast = checkbox.checked;
+      await saveAppState();
+      const feedback = document.querySelector("#role-save-feedback");
+      if (feedback) {
+        feedback.textContent = checkbox.checked
+          ? `🎙️ ${targetUser.name} agora pode entrar Ao Vivo na Rádio!`
+          : `Permissão de Rádio Ao Vivo removida de ${targetUser.name}.`;
       }
     });
   });
@@ -812,6 +1069,318 @@ function renderUsersRoleManager() {
 
   pageContainer.innerHTML = appState.users.map(buildUserRoleCardHtml).join("");
   wireUserRoleSelects(pageContainer);
+}
+
+// Renderização da Página Meu Perfil + Carteira Digital + Fichas da Secretaria/ADM
+function renderProfilePage() {
+  if (!currentUser) return;
+  const form = document.querySelector("#profile-form");
+  if (form) {
+    const fields = {
+      "#prof-name": currentUser.name,
+      "#prof-member-card": currentUser.memberCard,
+      "#prof-cpf": currentUser.cpf,
+      "#prof-birth": currentUser.birthDate,
+      "#prof-phone": currentUser.phone,
+      "#prof-baptism": currentUser.baptismDate,
+      "#prof-address": currentUser.address,
+    };
+    Object.entries(fields).forEach(([sel, val]) => {
+      const input = document.querySelector(sel);
+      if (input && document.activeElement !== input) input.value = val || "";
+    });
+  }
+
+  const cardPreview = document.querySelector("#member-card-preview");
+  if (cardPreview) {
+    const subRoleText =
+      currentUser.subRoleId && currentUser.subRoleId !== "nenhum"
+        ? SUBROLE_LABELS[currentUser.subRoleId]
+        : ROLE_LABELS[currentUser.roleId] || currentUser.role;
+
+    cardPreview.innerHTML = `
+      <div class="member-badge-card">
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid rgba(255,255,255,0.18); padding-bottom: 12px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div class="brand-mark" style="width: 38px; height: 38px; flex-basis: 38px;">${getLogoHtml()}</div>
+            <div>
+              <strong style="display: block; font-size: 14px;">${escapeHtml(currentUser.church)}</strong>
+              <small style="opacity: 0.8;">${escapeHtml(currentUser.pastor)}</small>
+            </div>
+          </div>
+          <span class="tag" style="background: #f3b743; color: #18342f;">${escapeHtml(currentUser.memberCard || "IGR-0001")}</span>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 14px;">
+          ${getAvatarHtml(currentUser, 68)}
+          <div>
+            <strong style="font-size: 18px; display: block;">${escapeHtml(currentUser.name)}</strong>
+            <span style="display: inline-block; margin-top: 4px; padding: 3px 8px; border-radius: 6px; background: rgba(255,255,255,0.15); font-size: 12px; font-weight: 800;">
+              ${escapeHtml(ROLE_LABELS[currentUser.roleId])} • ${escapeHtml(subRoleText)}
+            </span>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 12px; background: rgba(0,0,0,0.18); padding: 10px; border-radius: 8px;">
+          <div><span style="opacity:0.75;">Aniversário:</span><br/><strong>${escapeHtml(formatDate(currentUser.birthDate) || "Não informado")}</strong></div>
+          <div><span style="opacity:0.75;">Batismo/Membro:</span><br/><strong>${escapeHtml(formatDate(currentUser.baptismDate) || "Não informado")}</strong></div>
+          <div><span style="opacity:0.75;">CPF (Restrito):</span><br/><strong>${escapeHtml(currentUser.cpf || "Não informado")}</strong></div>
+          <div><span style="opacity:0.75;">WhatsApp:</span><br/><strong>${escapeHtml(currentUser.phone || "Não informado")}</strong></div>
+        </div>
+      </div>
+    `;
+  }
+
+  // Painel Exclusivo ADM e Secretaria
+  const secPanel = document.querySelector("#secretaria-members-panel");
+  const secList = document.querySelector("#secretaria-members-list");
+  const secCount = document.querySelector("#secretaria-count");
+  if (!secPanel || !secList) return;
+
+  if (!canViewSecretariaData()) {
+    secPanel.style.display = "none";
+    return;
+  }
+
+  secPanel.style.display = "block";
+  if (secCount) secCount.textContent = String(appState.users.length);
+
+  const query = (document.querySelector("#secretaria-search")?.value || "").toLowerCase();
+  const filtered = appState.users.filter((u) => {
+    const text = `${u.name} ${u.login} ${u.cpf || ""} ${u.memberCard || ""} ${u.church}`.toLowerCase();
+    return !query || text.includes(query);
+  });
+
+  secList.innerHTML = filtered.length
+    ? filtered
+        .map(
+          (u) => `
+        <article class="visit-item" style="grid-template-columns: minmax(0, 1fr);">
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              ${getAvatarHtml(u, 52)}
+              <div>
+                <div class="tag-row">
+                  <span class="tag">${escapeHtml(u.memberCard || "Sem Nº")}</span>
+                  <span class="tag">${escapeHtml(ROLE_LABELS[u.roleId])}</span>
+                  <span class="status-pill">${escapeHtml(SUBROLE_LABELS[u.subRoleId || "nenhum"])}</span>
+                  <span class="tag">${escapeHtml(u.church)}</span>
+                </div>
+                <h3 style="margin-top: 4px;">${escapeHtml(u.name)}</h3>
+                <small style="color: var(--muted);">E-mail: ${escapeHtml(u.login)} | WhatsApp: ${escapeHtml(u.phone || "Não informado")}</small>
+              </div>
+            </div>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-top: 10px; padding: 10px; background: #f4f6f3; border-radius: 6px; font-size: 13px;">
+            <div><strong>CPF:</strong> ${escapeHtml(u.cpf || "Não preenchido")}</div>
+            <div><strong>Aniversário:</strong> ${escapeHtml(formatDate(u.birthDate) || "Não preenchido")}</div>
+            <div><strong>Batismo:</strong> ${escapeHtml(formatDate(u.baptismDate) || "Não preenchido")}</div>
+            <div style="grid-column: 1 / -1;"><strong>Endereço Residencial:</strong> ${escapeHtml(u.address || "Não preenchido")}</div>
+          </div>
+        </article>
+      `
+        )
+        .join("")
+    : emptyCard("Nenhum membro encontrado para esta busca.");
+}
+
+// Renderização da Rádio Ao Vivo
+function renderRadioPage() {
+  const studio = document.querySelector("#radio-broadcaster-studio");
+  if (studio) {
+    studio.style.display = canBroadcastRadio() ? "block" : "none";
+  }
+
+  const live = appState.radioLive || { active: false };
+  const badge = document.querySelector("#radio-status-badge");
+  const indicator = document.querySelector("#radio-live-indicator");
+  const titleEl = document.querySelector("#radio-current-title");
+  const speakerEl = document.querySelector("#radio-speaker-name");
+  const churchEl = document.querySelector("#radio-speaker-church");
+  const extPlayer = document.querySelector("#external-audio-player");
+  const stopBtn = document.querySelector("#stop-broadcast-btn");
+
+  if (badge) {
+    badge.textContent = live.active ? "🔴 AO VIVO AGORA" : "Offline no momento";
+    badge.style.background = live.active ? "#fde8e8" : "#e8f0fb";
+    badge.style.color = live.active ? "#b33a30" : "var(--blue)";
+  }
+  if (indicator) {
+    indicator.style.background = live.active ? "#ef4444" : "#9ca3af";
+    indicator.style.boxShadow = live.active ? "0 0 12px #ef4444" : "none";
+  }
+  if (titleEl) {
+    titleEl.textContent = live.active ? live.title || "Transmissão Ao Vivo" : "Aguardando início da transmissão";
+  }
+  if (speakerEl) {
+    speakerEl.textContent = live.active ? `🎙️ No ar: ${live.speakerName}` : "Ninguém ao vivo no momento";
+  }
+  if (churchEl) {
+    churchEl.textContent = live.active
+      ? `${live.speakerChurch} — Transmissão ao vivo para todos os aparelhos`
+      : "Assim que o ADM ou líder autorizado entrar ao vivo, você ouvirá por aqui.";
+  }
+  if (stopBtn) {
+    stopBtn.style.display = live.active && canBroadcastRadio() ? "inline-flex" : "none";
+  }
+  if (extPlayer) {
+    if (live.active && live.streamUrl) {
+      extPlayer.style.display = "block";
+      if (extPlayer.src !== live.streamUrl) {
+        extPlayer.src = live.streamUrl;
+      }
+    } else {
+      extPlayer.style.display = "none";
+    }
+  }
+
+  const chatList = document.querySelector("#radio-chat-list");
+  if (chatList) {
+    const msgs = appState.radioMessages || [];
+    chatList.innerHTML = msgs.length
+      ? msgs
+          .slice(0, 30)
+          .map(
+            (m) => `
+          <div style="padding: 10px; border: 1px solid var(--line); border-radius: 6px; background: #fbfdfc;">
+            <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--muted);">
+              <strong>${escapeHtml(m.author)} (${escapeHtml(m.church)})</strong>
+              <span>${escapeHtml(m.time)}</span>
+            </div>
+            <p style="margin: 4px 0 0; font-size: 14px;">${escapeHtml(m.text)}</p>
+          </div>
+        `
+          )
+          .join("")
+      : emptyCard("Nenhuma mensagem ainda. Seja o primeiro a enviar um Amém!");
+  }
+}
+
+async function startMicrophoneBroadcast() {
+  if (!canBroadcastRadio()) return;
+  const title = document.querySelector("#broadcast-title")?.value.trim() || "Palavra Pastoral Ao Vivo";
+  const streamUrl = document.querySelector("#broadcast-stream-url")?.value.trim() || "";
+  const feedback = document.querySelector("#broadcaster-feedback");
+
+  appState.radioLive = {
+    active: true,
+    title,
+    speakerName: currentUser.name,
+    speakerChurch: `${currentUser.church} (${ROLE_LABELS[currentUser.roleId]})`,
+    streamUrl,
+    updatedAt: Date.now(),
+  };
+  await saveAppState();
+  renderRadioPage();
+
+  if (streamUrl) {
+    if (feedback) feedback.textContent = "🔴 Rádio Ao Vivo iniciada com Link de Stream!";
+    return;
+  }
+
+  try {
+    micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    if (feedback) feedback.textContent = "🔴 MICROFONE NO AR! Tudo o que você falar agora está sendo enviado ao vivo.";
+
+    const recordAndSendChunk = () => {
+      if (!micStream || !appState.radioLive?.active) return;
+      const recorder = new MediaRecorder(micStream);
+      const chunks = [];
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) chunks.push(e.data);
+      };
+      recorder.onstop = () => {
+        if (!chunks.length) return;
+        const blob = new Blob(chunks, { type: recorder.mimeType || "audio/webm" });
+        const reader = new FileReader();
+        reader.onloadend = async () => {
+          const endpoint = getCloudEndpoint("appigreja_radio_chunk");
+          if (!endpoint) return;
+          try {
+            await fetch(endpoint, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                id: Date.now(),
+                speaker: currentUser.name,
+                audioUrl: String(reader.result || ""),
+              }),
+            });
+          } catch (err) {
+            console.warn("Falha no envio de chunk de áudio:", err);
+          }
+        };
+        reader.readAsDataURL(blob);
+      };
+      recorder.start();
+      setTimeout(() => {
+        if (recorder.state === "recording") recorder.stop();
+      }, 2400);
+    };
+
+    recordAndSendChunk();
+    if (micRecorderInterval) clearInterval(micRecorderInterval);
+    micRecorderInterval = setInterval(recordAndSendChunk, 2500);
+  } catch (err) {
+    if (feedback) {
+      feedback.textContent = "Permissão de microfone negada no navegador. Libere o microfone no cadeado da barra de endereços!";
+    }
+  }
+}
+
+async function stopBroadcast() {
+  if (micRecorderInterval) {
+    clearInterval(micRecorderInterval);
+    micRecorderInterval = null;
+  }
+  if (micStream) {
+    micStream.getTracks().forEach((t) => t.stop());
+    micStream = null;
+  }
+  appState.radioLive = {
+    active: false,
+    title: "",
+    speakerName: "",
+    speakerChurch: "",
+    streamUrl: "",
+    updatedAt: Date.now(),
+  };
+  await saveAppState();
+  const feedback = document.querySelector("#broadcaster-feedback");
+  if (feedback) feedback.textContent = "Transmissão encerrada.";
+  renderRadioPage();
+}
+
+function startListeningRadioLoop() {
+  isListeningRadio = true;
+  const statusEl = document.querySelector("#listener-audio-status");
+  if (statusEl) statusEl.textContent = "✅ Sintonizado! Aguardando voz ao vivo...";
+
+  const extPlayer = document.querySelector("#external-audio-player");
+  if (extPlayer && appState.radioLive?.streamUrl) {
+    extPlayer.play().catch(() => {});
+  }
+
+  setInterval(async () => {
+    if (!isListeningRadio) return;
+    const endpoint = getCloudEndpoint("appigreja_radio_chunk");
+    if (!endpoint) return;
+    try {
+      const res = await fetch(endpoint, { cache: "no-store" });
+      if (!res.ok) return;
+      const chunk = await res.json();
+      if (chunk && chunk.id && chunk.id !== lastPlayedChunkId && Date.now() - chunk.id < 15000) {
+        lastPlayedChunkId = chunk.id;
+        if (chunk.audioUrl) {
+          const audio = new Audio(chunk.audioUrl);
+          audio.play().catch(() => {});
+          if (statusEl) statusEl.textContent = `🔊 Ouvindo ao vivo: ${chunk.speaker || "Locutor"}`;
+        }
+      }
+    } catch {
+      // ignora oscilações de rede
+    }
+  }, 1800);
 }
 
 function renderVisitUserFields() {
@@ -1408,7 +1977,10 @@ function readFileAsDataUrl(file) {
 }
 
 function renderAll() {
+  applyChurchLogoEverywhere();
   renderUsersRoleManager();
+  renderProfilePage();
+  renderRadioPage();
   renderWorkerFilter();
   renderVisitUserFields();
   setAutomaticVisitDate();
@@ -1459,10 +2031,20 @@ function wireAuth() {
       passwordHash: await hashPassword(String(form.get("password"))),
       roleId,
       role: ROLE_LABELS[roleId] || "Obreiro",
+      subRoleId: "nenhum",
+      subRole: SUBROLE_LABELS.nenhum,
+      canBroadcast: roleId === "adm",
       churchId,
       church: church.name,
       pastor: church.pastor,
       pastorId: church.pastorId,
+      memberCard: `IGR-${String(appState.users.length + 1).padStart(4, "0")}`,
+      photoUrl: "",
+      cpf: "",
+      birthDate: "",
+      phone: "",
+      baptismDate: "",
+      address: "",
       createdAt: new Date().toISOString(),
     };
 
@@ -1499,10 +2081,85 @@ function wireEvents() {
   document.querySelector("#logout-button")?.addEventListener("click", logout);
   document.querySelector("#reset-db-btn")?.addEventListener("click", resetEntireDatabase);
 
+  // Upload da Logo da Igreja pelo ADM
+  document.querySelector("#upload-church-logo-input")?.addEventListener("change", async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const compressedLogo = await compressImageFile(file, 220);
+    if (compressedLogo) {
+      appState.churchLogo = compressedLogo;
+      await saveAppState();
+      applyChurchLogoEverywhere();
+      const fb = document.querySelector("#role-save-feedback");
+      if (fb) fb.textContent = "🖼️ Logo da Igreja atualizado em todo o aplicativo!";
+    }
+  });
+
+  // Upload da Foto de Perfil do Usuário em perfil.html
+  document.querySelector("#profile-photo-input")?.addEventListener("change", async (event) => {
+    const file = event.target.files?.[0];
+    if (!file || !currentUser) return;
+    const compressedPhoto = await compressImageFile(file, 260);
+    if (compressedPhoto) {
+      currentUser.photoUrl = compressedPhoto;
+      await saveAppState();
+      const fb = document.querySelector("#profile-feedback");
+      if (fb) fb.textContent = "📷 Foto de perfil atualizada!";
+      renderAll();
+    }
+  });
+
+  // Salvar Dados Cadastrais do Perfil (Carteira de Membro, CPF, Aniversário, Endereço)
+  document.querySelector("#profile-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!currentUser) return;
+    const form = new FormData(event.currentTarget);
+    currentUser.name = String(form.get("name") || currentUser.name).trim();
+    currentUser.memberCard = String(form.get("memberCard") || "").trim();
+    currentUser.cpf = String(form.get("cpf") || "").trim();
+    currentUser.birthDate = String(form.get("birthDate") || "");
+    currentUser.phone = String(form.get("phone") || "").trim();
+    currentUser.baptismDate = String(form.get("baptismDate") || "");
+    currentUser.address = String(form.get("address") || "").trim();
+
+    await saveAppState();
+    const fb = document.querySelector("#profile-feedback");
+    if (fb) fb.textContent = "✅ Dados do perfil e carteira salvos com sucesso!";
+    renderAll();
+  });
+
+  document.querySelector("#secretaria-search")?.addEventListener("input", renderProfilePage);
+
+  // Eventos da Rádio Ao Vivo
+  document.querySelector("#start-mic-broadcast-btn")?.addEventListener("click", startMicrophoneBroadcast);
+  document.querySelector("#stop-broadcast-btn")?.addEventListener("click", stopBroadcast);
+  document.querySelector("#listen-radio-btn")?.addEventListener("click", startListeningRadioLoop);
+
+  document.querySelector("#radio-chat-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!currentUser) return;
+    const formEl = event.currentTarget;
+    const form = new FormData(formEl);
+    const text = String(form.get("text") || "").trim();
+    if (!text) return;
+    appState.radioMessages = appState.radioMessages || [];
+    appState.radioMessages.unshift({
+      id: `rmsg_${Date.now()}`,
+      author: currentUser.name,
+      church: currentUser.church,
+      text,
+      time: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+    });
+    await saveAppState();
+    formEl.reset();
+    renderRadioPage();
+  });
+
   document.querySelector("#promote-self-adm")?.addEventListener("click", async () => {
     if (!currentUser) return;
     currentUser.roleId = "adm";
     currentUser.role = ROLE_LABELS.adm;
+    currentUser.canBroadcast = true;
     await saveAppState();
     window.location.href = "dashboard.html";
   });
@@ -1528,6 +2185,7 @@ function wireEvents() {
     const churchId = normalizeChurchId(form.get("churchId"));
     const church = CHURCHES[churchId] || CHURCHES.sede;
     const roleId = form.get("roleId") || "obreiro";
+    const subRoleId = form.get("subRoleId") || "nenhum";
 
     appState.users.push({
       id: `user_${Date.now()}`,
@@ -1537,16 +2195,26 @@ function wireEvents() {
       passwordHash: await hashPassword(String(form.get("password"))),
       roleId,
       role: ROLE_LABELS[roleId] || "Obreiro",
+      subRoleId,
+      subRole: SUBROLE_LABELS[subRoleId] || "Sem subcargo específico",
+      canBroadcast: roleId === "adm" || subRoleId === "pastor_adm",
       churchId,
       church: church.name,
       pastor: church.pastor,
       pastorId: church.pastorId,
+      memberCard: `IGR-${String(appState.users.length + 1).padStart(4, "0")}`,
+      photoUrl: "",
+      cpf: "",
+      birthDate: "",
+      phone: "",
+      baptismDate: "",
+      address: "",
       createdAt: new Date().toISOString(),
     });
 
     await saveAppState();
     formElement.reset();
-    if (msgEl) msgEl.textContent = "Pessoa cadastrada e cargo atribuído com sucesso!";
+    if (msgEl) msgEl.textContent = "Pessoa cadastrada com cargo e subcargo!";
     renderAll();
   });
 
@@ -1646,18 +2314,6 @@ function wireEvents() {
     });
   });
 
-  document.querySelector("#focus-library-form")?.addEventListener("click", () => {
-    document.querySelector("#library-form input[name='title']")?.focus();
-  });
-
-  document.querySelector("#focus-notification-form")?.addEventListener("click", () => {
-    document.querySelector("#notification-form input[name='title']")?.focus();
-  });
-
-  document.querySelector("#focus-calendar-form")?.addEventListener("click", () => {
-    document.querySelector("#calendar-form input[name='title']")?.focus();
-  });
-
   document.querySelector("#library-form")?.addEventListener("submit", async (event) => {
     event.preventDefault();
     if (!isAdmin()) return;
@@ -1740,6 +2396,7 @@ function wireEvents() {
 async function initApp() {
   injectCriticalFixesCss();
   injectPwaTags();
+  applyChurchLogoEverywhere();
   const currentPage = getCurrentPage();
   const savedUserId = localStorage.getItem(SESSION_KEY);
   currentUser = appState.users.find((user) => user.id === savedUserId) || null;
@@ -1748,6 +2405,7 @@ async function initApp() {
     wireAuth();
     showAuthMode("login");
     await syncFromCloud();
+    applyChurchLogoEverywhere();
     currentUser = appState.users.find((user) => user.id === savedUserId) || null;
     if (currentUser) {
       window.location.replace(getHomePageForUser(currentUser));
