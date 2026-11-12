@@ -125,24 +125,36 @@ async function syncFromCloud() {
     const response = await fetch(endpoint, { cache: "no-store" });
     if (!response.ok) return;
     const cloudData = await response.json();
+
     if (cloudData && typeof cloudData === "object") {
+      // Banco na nuvem tem dados: atualiza o navegador com a versão da nuvem
       appState = normalizeStateData(cloudData);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
       const savedUserId = localStorage.getItem(SESSION_KEY);
       if (savedUserId) {
-        currentUser = appState.users.find((u) => u.id === savedUserId) || currentUser;
+        currentUser = appState.users.find((u) => u.id === savedUserId) || null;
+        if (!currentUser && getCurrentPage() !== "index.html") {
+          logout();
+          return;
+        }
       }
       if (getCurrentPage() !== "index.html") {
         renderAll();
       }
-    } else if (appState.users.length > 0) {
-      await saveAppState();
+    } else if (cloudData === null) {
+      // Banco na nuvem foi apagado: limpa o cache local para não ressuscitar dados antigos
+      appState = emptyState();
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(SESSION_KEY);
+      currentUser = null;
+      if (getCurrentPage() !== "index.html") {
+        window.location.replace("index.html");
+      }
     }
   } catch (err) {
     console.warn("Modo local ativo:", err);
   }
 }
-
 async function saveAppState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
   const endpoint = getCloudEndpoint();
