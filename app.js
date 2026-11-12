@@ -1,7 +1,7 @@
 const STORAGE_KEY = "appigreja_prototype_state_v1";
 const SESSION_KEY = "appigreja_prototype_session_v1";
 
-// COLE AQUI O LINK DO SEU FIREBASE REALTIME DATABASE QUANDO CRIAR (ex: "https://appigreja-xxxxx-default-rtdb.firebaseio.com")
+// Se usar o Firebase depois, cole a URL aqui (ex: "https://appigreja-default-rtdb.firebaseio.com")
 const CLOUD_DB_URL = "";
 
 const CHURCHES = {
@@ -30,7 +30,7 @@ const PAGE_PERMISSIONS = {
 };
 
 const NAV_ITEMS = [
-  { href: "dashboard.html", icon: "D", label: "Dashboard", roles: ["pastor", "bispo", "adm"] },
+  { href: "dashboard.html", icon: "D", label: "Dashboard & Cargos", roles: ["pastor", "bispo", "adm"] },
   { href: "visitas.html", icon: "V", label: "Visitas realizadas", roles: ["obreiro", "lideranca", "pastor", "bispo", "adm"] },
   { href: "nova-visita.html", icon: "+", label: "Nova visita", roles: ["obreiro", "lideranca", "pastor", "bispo", "adm"] },
   { href: "zaqueus.html", icon: "Z", label: "Zaqueus", roles: ["obreiro", "lideranca", "pastor", "bispo", "adm"] },
@@ -87,7 +87,6 @@ function normalizeStateData(raw) {
     u.role = ROLE_LABELS[u.roleId];
   });
 
-  // Garante que se existir usuário cadastrado, mas nenhum for ADM, o 1º usuário vira ADM automaticamente
   if (state.users.length > 0 && !state.users.some((u) => u.roleId === "adm")) {
     state.users[0].roleId = "adm";
     state.users[0].role = ROLE_LABELS.adm;
@@ -157,6 +156,39 @@ async function saveAppState() {
   } catch (err) {
     console.warn("Salvo localmente:", err);
   }
+}
+
+// Corrige qualquer conflito de CSS antigo garantindo que todas as telas e painéis apareçam
+function injectCriticalFixesCss() {
+  if (document.querySelector("#appigreja-fixes-css")) return;
+  const style = document.createElement("style");
+  style.id = "appigreja-fixes-css";
+  style.textContent = `
+    body.is-authenticated .app-shell { display: grid !important; }
+    body.is-authenticated .screen { display: block !important; }
+    body.can-dashboard .dashboard-only { display: block !important; }
+    .inline-admin-panel {
+      margin-bottom: 20px;
+      border: 2px solid #9bc6bb;
+      background: #f5fbf8;
+    }
+    .user-role-row {
+      display: grid;
+      grid-template-columns: minmax(180px, 1.2fr) minmax(140px, 1fr) minmax(180px, 1fr) auto;
+      gap: 12px;
+      align-items: center;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #ffffff;
+    }
+    @media (max-width: 820px) {
+      .user-role-row {
+        grid-template-columns: 1fr;
+      }
+    }
+  `;
+  document.head.appendChild(style);
 }
 
 function injectPwaTags() {
@@ -299,14 +331,9 @@ function getVisibleZaqueus() {
   return appState.zaqueus.filter((z) => !z.churchId || z.churchId === currentUser.churchId);
 }
 
+// Notificações visíveis para TODOS os usuários (sem esconder nada no mural)
 function getVisibleNotifications() {
-  if (!currentUser) return [];
-  if (currentUser.roleId === "adm" || currentUser.roleId === "bispo") {
-    return appState.notifications;
-  }
-  return appState.notifications.filter(
-    (n) => !n.audienceKey || n.audienceKey === "todos" || n.audienceKey === currentUser.roleId
-  );
+  return appState.notifications || [];
 }
 
 function setAuthMessage(message, tone = "info") {
@@ -337,28 +364,15 @@ function logout() {
   window.location.href = "index.html";
 }
 
-function switchAdmTab(mode) {
-  const modes = ["content", "notify", "calendar", "users"];
-  modes.forEach((m) => {
-    const radio = document.querySelector(`#adm-mode-${m}`);
-    const label = document.querySelector(`label[for="adm-mode-${m}"]`);
-    const panel = document.querySelector(`[data-adm-panel="${m}"]`);
-    const isActive = m === mode;
-    if (radio) radio.checked = isActive;
-    if (label) {
-      label.style.background = isActive ? "var(--green)" : "transparent";
-      label.style.color = isActive ? "#ffffff" : "var(--muted)";
-    }
-    if (panel) {
-      panel.style.display = isActive ? "grid" : "none";
-    }
-  });
-}
-
 function injectSharedShell() {
-  const shell = document.querySelector("#app-shell");
-  const main = document.querySelector("#main-content");
+  const shell = document.querySelector("#app-shell") || document.querySelector(".app-shell");
+  const main = document.querySelector("#main-content") || document.querySelector(".main");
   if (!shell || !main || !currentUser) return;
+
+  // Remove barras duplicadas caso o HTML já tenha alguma
+  shell.querySelectorAll(".sidebar").forEach((el) => el.remove());
+  main.querySelectorAll(".topbar").forEach((el) => el.remove());
+  document.querySelectorAll(".adm-chat, #adm-drawer-toggle").forEach((el) => el.remove());
 
   const currentPage = getCurrentPage();
   const pageTitle = document.querySelector("main h2")?.textContent.trim() || "APPIGREJA";
@@ -397,14 +411,19 @@ function injectSharedShell() {
     </aside>
   `;
 
-  const dbStatus = getCloudEndpoint() ? "Banco em Nuvem Ativo" : "Modo Local";
+  const promoteSelfBtn =
+    currentUser.roleId !== "adm"
+      ? `<button class="secondary-button" type="button" id="promote-self-adm" title="Ativar perfil ADM para testar na faculdade">Virar ADM (Teste)</button>`
+      : `<a class="secondary-button" href="dashboard.html#gestao-cargos">Gerenciar Cargos (${appState.users.length})</a>`;
+
   const topbarHtml = `
     <header class="topbar">
       <div>
-        <p class="eyebrow">${escapeHtml(ROLE_LABELS[currentUser.roleId])} | ${escapeHtml(currentUser.church)} (${escapeHtml(currentUser.pastor)}) — ${dbStatus}</p>
+        <p class="eyebrow">Perfil: ${escapeHtml(ROLE_LABELS[currentUser.roleId])} | ${escapeHtml(currentUser.church)} (${escapeHtml(currentUser.pastor)})</p>
         <h1 id="screen-title">${escapeHtml(pageTitle)}</h1>
       </div>
       <div class="topbar-actions">
+        ${promoteSelfBtn}
         <label class="search">
           <span aria-hidden="true">B</span>
           <input id="global-search" type="search" placeholder="Buscar visitante ou visitado" />
@@ -417,54 +436,189 @@ function injectSharedShell() {
   shell.insertAdjacentHTML("afterbegin", sidebarHtml);
   main.insertAdjacentHTML("afterbegin", topbarHtml);
 
-  // Injeta um painel grande de Gestão de Pessoas e Cargos no final do Dashboard e da Visão Geral
-  if (canManageRoles() && (currentPage === "dashboard.html" || currentPage === "visao.html")) {
-    const mainScreen = main.querySelector(".screen");
-    if (mainScreen && !document.querySelector("#page-users-section")) {
-      mainScreen.insertAdjacentHTML(
-        "beforeend",
-        `
-        <section class="panel wide" id="page-users-section" style="margin-top: 18px;">
-          <div class="panel-header">
-            <div>
-              <p class="eyebrow">Controle de Hierarquia e E-mail Único</p>
-              <h3>Pessoas Registradas no Sistema (<span id="registered-users-count">0</span>)</h3>
-            </div>
+  // 1. INJETA O PAINEL DE PESSOAS REGISTRADAS E CARGOS NO TOPO DO DASHBOARD E VISÃO GERAL
+  const dashboardScreen = document.querySelector("#dashboard") || document.querySelector("#visao");
+  if (dashboardScreen && canManageRoles() && !document.querySelector("#gestao-cargos")) {
+    const heading = dashboardScreen.querySelector(".section-heading");
+    const usersPanelHtml = `
+      <section class="panel wide inline-admin-panel" id="gestao-cargos">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Administração de Acessos e Hierarquia</p>
+            <h3>Pessoas Registradas no Sistema (<span id="registered-users-count">0</span>)</h3>
           </div>
-          <div class="visit-list" id="page-users-list"></div>
-        </section>
-      `
-      );
+          <span class="status-pill" id="role-save-feedback">Altere o cargo ou igreja abaixo</span>
+        </div>
+
+        <div class="visit-list" id="page-users-list" style="margin-top: 12px; margin-bottom: 18px;"></div>
+
+        <details style="border-top: 1px solid var(--line); padding-top: 14px;">
+          <summary style="cursor: pointer; font-weight: 800; color: var(--green-dark);">+ Cadastrar Nova Pessoa e Definir Cargo Diretamente</summary>
+          <form class="stack-form" id="admin-add-user-form" style="margin-top: 12px;">
+            <div class="form-grid">
+              <label>
+                Nome completo
+                <input name="name" type="text" placeholder="Nome do obreiro, líder ou pastor" required />
+              </label>
+              <label>
+                E-mail único
+                <input name="login" type="email" placeholder="email@exemplo.com" required />
+              </label>
+              <label>
+                Senha inicial
+                <input name="password" type="password" minlength="4" placeholder="Mínimo 4 dígitos" required />
+              </label>
+              <label>
+                Igreja vinculada
+                <select name="churchId" required>
+                  <option value="sede">Igreja Sede (Bispo Wagner)</option>
+                  <option value="campineiro">Igreja Campineiro (Pastora Lindamir)</option>
+                  <option value="mogi">Igreja Mogi Guaçu (Pastor Paulo)</option>
+                </select>
+              </label>
+              <label>
+                Cargo / Nível de Hierarquia
+                <select name="roleId" required>
+                  <option value="obreiro">Obreiro</option>
+                  <option value="lideranca">Liderança</option>
+                  <option value="pastor">Pastor</option>
+                  <option value="bispo">Bispo</option>
+                  <option value="adm">ADM</option>
+                </select>
+              </label>
+            </div>
+            <div class="form-actions">
+              <span id="admin-add-user-msg" style="font-weight: 700; color: var(--green);"></span>
+              <button class="primary-button" type="submit">Cadastrar Pessoa com Cargo</button>
+            </div>
+          </form>
+        </details>
+      </section>
+    `;
+    if (heading) {
+      heading.insertAdjacentHTML("afterend", usersPanelHtml);
+    } else {
+      dashboardScreen.insertAdjacentHTML("afterbegin", usersPanelHtml);
     }
   }
 
-  if (isAdmin()) {
-    const admHtml = `
-      <input class="adm-toggle" type="checkbox" id="adm-drawer-toggle" />
-      <div class="adm-chat admin-only" aria-label="Painel rápido ADM">
-        <label class="adm-fab" for="adm-drawer-toggle">ADM</label>
-        <section class="adm-panel">
-          <input class="adm-mode" type="radio" name="adm-mode" id="adm-mode-content" />
-          <input class="adm-mode" type="radio" name="adm-mode" id="adm-mode-notify" />
-          <input class="adm-mode" type="radio" name="adm-mode" id="adm-mode-calendar" />
-          <input class="adm-mode" type="radio" name="adm-mode" id="adm-mode-users" checked />
-          <header class="adm-header">
-            <div>
-              <p class="eyebrow">Gestão (${escapeHtml(ROLE_LABELS[currentUser.roleId])})</p>
-              <h3>Painel Administrativo</h3>
-            </div>
-            <label class="adm-minimize" for="adm-drawer-toggle">Minimizar</label>
-          </header>
-          <div class="adm-tabs" style="grid-template-columns: repeat(4, 1fr);">
-            <label for="adm-mode-users" data-tab-btn="users">Cargos</label>
-            <label for="adm-mode-content" data-tab-btn="content">Conteúdo</label>
-            <label for="adm-mode-notify" data-tab-btn="notify">Aviso</label>
-            <label for="adm-mode-calendar" data-tab-btn="calendar">Agenda</label>
+  // 2. INJETA O FORMULÁRIO DE NOTIFICAÇÕES DIRETO EM notificacoes.html
+  const notifScreen = document.querySelector("#notificacoes");
+  if (notifScreen && isAdmin() && !document.querySelector("#inline-notification-form-panel")) {
+    const heading = notifScreen.querySelector(".section-heading");
+    const notifFormHtml = `
+      <section class="panel wide inline-admin-panel" id="inline-notification-form-panel">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Publicar no Mural para Todos</p>
+            <h3>Nova Notificação</h3>
           </div>
-          <div class="stack-form adm-users-panel" id="adm-users-list" data-adm-panel="users"></div>
-          <form class="stack-form adm-content-form" id="library-form" data-adm-panel="content">
+        </div>
+        <form class="stack-form" id="notification-form" style="margin-top: 12px;">
+          <div class="form-grid">
             <label>
-              Tipo
+              Título / Assunto
+              <input name="title" type="text" placeholder="Ex: Reunião Geral de Obreiros" required />
+            </label>
+            <label>
+              Destaque de Público (Aparece no mural para todos)
+              <select name="audience">
+                <option value="todos">Todos os usuários</option>
+                <option value="obreiro">Obreiros</option>
+                <option value="lideranca">Liderança</option>
+                <option value="pastor">Pastores e Bispo</option>
+                <option value="adm">Administração</option>
+              </select>
+            </label>
+          </div>
+          <label>
+            Mensagem do Aviso
+            <textarea name="message" rows="3" placeholder="Digite o comunicado que aparecerá para todos no aplicativo..." required></textarea>
+          </label>
+          <div class="form-actions">
+            <span id="notif-feedback" style="font-weight: 700; color: var(--green);"></span>
+            <button class="primary-button" type="submit">Publicar Notificação</button>
+          </div>
+        </form>
+      </section>
+    `;
+    if (heading) {
+      heading.insertAdjacentHTML("afterend", notifFormHtml);
+    } else {
+      notifScreen.insertAdjacentHTML("afterbegin", notifFormHtml);
+    }
+  }
+
+  // 3. INJETA O FORMULÁRIO DE EVENTOS DIRETO EM calendario.html
+  const calScreen = document.querySelector("#calendario");
+  if (calScreen && isAdmin() && !document.querySelector("#inline-calendar-form-panel")) {
+    const heading = calScreen.querySelector(".section-heading");
+    const calFormHtml = `
+      <section class="panel wide inline-admin-panel" id="inline-calendar-form-panel">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Programação Oficial (Visível para Todos)</p>
+            <h3>Cadastrar Novo Evento no Calendário</h3>
+          </div>
+        </div>
+        <form class="stack-form" id="calendar-form" style="margin-top: 12px;">
+          <div class="form-grid">
+            <label>
+              Nome do Culto ou Evento
+              <input name="title" type="text" placeholder="Ex: Santa Ceia / Culto de Ensino" required />
+            </label>
+            <label>
+              Igreja Realizadora
+              <select name="church">
+                <option value="Todas as Igrejas">Todas as Igrejas</option>
+                <option value="Igreja Sede (Bispo Wagner)">Igreja Sede (Bispo Wagner)</option>
+                <option value="Igreja Campineiro (Pastora Lindamir)">Igreja Campineiro (Pastora Lindamir)</option>
+                <option value="Igreja Mogi Guaçu (Pastor Paulo)">Igreja Mogi Guaçu (Pastor Paulo)</option>
+              </select>
+            </label>
+            <label>
+              Data do Evento
+              <input name="date" type="date" value="${formatDateLocal()}" required />
+            </label>
+            <label>
+              Horário
+              <input name="time" type="time" value="19:30" required />
+            </label>
+          </div>
+          <label>
+            Descrição / Observações
+            <input name="description" type="text" placeholder="Detalhes da programação para os membros..." />
+          </label>
+          <div class="form-actions">
+            <span id="cal-feedback" style="font-weight: 700; color: var(--green);"></span>
+            <button class="primary-button" type="submit">Salvar Evento no Calendário</button>
+          </div>
+        </form>
+      </section>
+    `;
+    if (heading) {
+      heading.insertAdjacentHTML("afterend", calFormHtml);
+    } else {
+      calScreen.insertAdjacentHTML("afterbegin", calFormHtml);
+    }
+  }
+
+  // 4. INJETA O FORMULÁRIO DE BIBLIOTECA DIRETO EM biblioteca.html
+  const libScreen = document.querySelector("#biblioteca");
+  if (libScreen && isAdmin() && !document.querySelector("#inline-library-form-panel")) {
+    const heading = libScreen.querySelector(".section-heading");
+    const libFormHtml = `
+      <section class="panel wide inline-admin-panel" id="inline-library-form-panel">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Publicar Material para Todos</p>
+            <h3>Adicionar Devocional, PDF, Foto ou Link</h3>
+          </div>
+        </div>
+        <form class="stack-form" id="library-form" style="margin-top: 12px;">
+          <div class="form-grid">
+            <label>
+              Categoria
               <select name="category">
                 <option value="devocional">Devocional</option>
                 <option value="direcionamento">Direcionamento</option>
@@ -472,118 +626,63 @@ function injectSharedShell() {
               </select>
             </label>
             <label>
-              Título
-              <input name="title" type="text" placeholder="Nome do material" required />
+              Título do Material
+              <input name="title" type="text" placeholder="Nome do estudo ou devocional" required />
             </label>
             <label>
-              Descrição
-              <textarea name="description" rows="3" placeholder="Resumo do conteúdo"></textarea>
-            </label>
-            <label>
-              Arquivo PDF ou foto
+              Arquivo PDF ou Foto (Opcional)
               <input name="file" type="file" accept=".pdf,image/*" />
             </label>
             <label>
-              Link de referência
+              Link Externo (Opcional)
               <input name="link" type="url" placeholder="https://..." />
             </label>
-            <button class="primary-button" type="submit">Adicionar na biblioteca</button>
-          </form>
-          <form class="stack-form adm-notify-form" id="notification-form" data-adm-panel="notify">
-            <label>
-              Destinatários
-              <select name="audience">
-                <option value="todos">Todos os usuários</option>
-                <option value="obreiro">Somente obreiros</option>
-                <option value="lideranca">Somente liderança</option>
-                <option value="pastor">Somente pastores</option>
-                <option value="adm">Somente ADMs</option>
-              </select>
-            </label>
-            <label>
-              Título
-              <input name="title" type="text" placeholder="Assunto da notificação" required />
-            </label>
-            <label>
-              Mensagem
-              <textarea name="message" rows="4" placeholder="Escreva o aviso que aparecerá para os usuários." required></textarea>
-            </label>
-            <button class="primary-button" type="submit">Gerar notificação</button>
-          </form>
-          <form class="stack-form adm-calendar-form" id="calendar-form" data-adm-panel="calendar">
-            <label>
-              Evento
-              <input name="title" type="text" placeholder="Nome do culto ou evento" required />
-            </label>
-            <div class="form-grid one">
-              <label>
-                Data
-                <input name="date" type="date" value="${formatDateLocal()}" required />
-              </label>
-              <label>
-                Horário
-                <input name="time" type="time" value="19:30" />
-              </label>
-            </div>
-            <label>
-              Igreja
-              <select name="church">
-                <option value="Igreja Sede">Igreja Sede</option>
-                <option value="Igreja Campineiro">Igreja Campineiro</option>
-                <option value="Igreja Mogi Guaçu">Igreja Mogi Guaçu</option>
-              </select>
-            </label>
-            <label>
-              Descrição
-              <textarea name="description" rows="2" placeholder="Detalhes da programação"></textarea>
-            </label>
-            <button class="primary-button" type="submit">Salvar no Calendário</button>
-          </form>
-        </section>
-      </div>
+          </div>
+          <label>
+            Descrição
+            <textarea name="description" rows="2" placeholder="Resumo do conteúdo para os obreiros e liderança"></textarea>
+          </label>
+          <div class="form-actions">
+            <span id="lib-feedback" style="font-weight: 700; color: var(--green);"></span>
+            <button class="primary-button" type="submit">Publicar na Biblioteca</button>
+          </div>
+        </form>
+      </section>
     `;
-    document.body.insertAdjacentHTML("beforeend", admHtml);
-
-    document.querySelectorAll("[data-tab-btn]").forEach((btn) => {
-      btn.addEventListener("click", (e) => {
-        e.preventDefault();
-        switchAdmTab(btn.dataset.tabBtn);
-      });
-    });
-
-    // Abre a aba Cargos por padrão quando clicar no botão ADM
-    switchAdmTab("users");
+    if (heading) {
+      heading.insertAdjacentHTML("afterend", libFormHtml);
+    } else {
+      libScreen.insertAdjacentHTML("afterbegin", libFormHtml);
+    }
   }
 }
 
 function buildUserRoleCardHtml(u) {
   const isSelf = u.id === currentUser?.id;
   return `
-    <div class="visit-item" style="grid-template-columns: 1fr; gap: 10px; background: #f8faf9;">
-      <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;">
-        <div>
-          <strong>${escapeHtml(u.name)} ${isSelf ? "(Você)" : ""}</strong>
-          <small style="display:block; color: var(--muted);">E-mail: ${escapeHtml(u.login)}</small>
-        </div>
-        <span class="tag">${escapeHtml(ROLE_LABELS[u.roleId] || u.role)} - ${escapeHtml(u.church)}</span>
+    <div class="user-role-row">
+      <div>
+        <strong style="font-size: 16px;">${escapeHtml(u.name)} ${isSelf ? "(Sua Conta)" : ""}</strong>
+        <small style="display:block; color: var(--muted);">E-mail único: ${escapeHtml(u.login)}</small>
       </div>
-      <div class="form-grid one" style="gap: 8px;">
-        <label style="font-size: 12px; color: var(--muted); font-weight: 700;">
-          Nível de Hierarquia
-          <select class="user-role-select" data-user-id="${escapeHtml(u.id)}">
-            ${Object.entries(ROLE_LABELS)
-              .map(([roleKey, label]) => `<option value="${roleKey}" ${u.roleId === roleKey ? "selected" : ""}>${label}</option>`)
-              .join("")}
-          </select>
-        </label>
-        <label style="font-size: 12px; color: var(--muted); font-weight: 700;">
-          Igreja Vinculada
-          <select class="user-church-select" data-user-id="${escapeHtml(u.id)}">
-            ${Object.entries(CHURCHES)
-              .map(([chKey, chObj]) => `<option value="${chKey}" ${u.churchId === chKey ? "selected" : ""}>${chObj.name} (${chObj.pastor})</option>`)
-              .join("")}
-          </select>
-        </label>
+      <label style="font-size: 12px; color: var(--muted); font-weight: 700; display: grid; gap: 4px;">
+        Cargo / Hierarquia
+        <select class="user-role-select" data-user-id="${escapeHtml(u.id)}">
+          ${Object.entries(ROLE_LABELS)
+            .map(([roleKey, label]) => `<option value="${roleKey}" ${u.roleId === roleKey ? "selected" : ""}>${label}</option>`)
+            .join("")}
+        </select>
+      </label>
+      <label style="font-size: 12px; color: var(--muted); font-weight: 700; display: grid; gap: 4px;">
+        Igreja Vinculada
+        <select class="user-church-select" data-user-id="${escapeHtml(u.id)}">
+          ${Object.entries(CHURCHES)
+            .map(([chKey, chObj]) => `<option value="${chKey}" ${u.churchId === chKey ? "selected" : ""}>${chObj.name} (${chObj.pastor})</option>`)
+            .join("")}
+        </select>
+      </label>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span class="tag">${escapeHtml(ROLE_LABELS[u.roleId] || u.role)}</span>
       </div>
     </div>
   `;
@@ -599,6 +698,8 @@ function wireUserRoleSelects(rootElement) {
       targetUser.roleId = select.value;
       targetUser.role = ROLE_LABELS[select.value] || "Obreiro";
       await saveAppState();
+      const feedback = document.querySelector("#role-save-feedback");
+      if (feedback) feedback.textContent = `Cargo de ${targetUser.name} salvo como ${targetUser.role}!`;
       if (targetUser.id === currentUser.id) {
         window.location.reload();
       } else {
@@ -617,6 +718,8 @@ function wireUserRoleSelects(rootElement) {
       targetUser.pastor = ch.pastor;
       targetUser.pastorId = ch.pastorId;
       await saveAppState();
+      const feedback = document.querySelector("#role-save-feedback");
+      if (feedback) feedback.textContent = `Igreja de ${targetUser.name} alterada para ${ch.name}!`;
       if (targetUser.id === currentUser.id) {
         window.location.reload();
       } else {
@@ -627,26 +730,19 @@ function wireUserRoleSelects(rootElement) {
 }
 
 function renderUsersRoleManager() {
-  if (!canManageRoles()) return;
-
   const countBadge = document.querySelector("#registered-users-count");
   if (countBadge) countBadge.textContent = String(appState.users.length);
 
-  const cardsHtml = appState.users.length
-    ? appState.users.map(buildUserRoleCardHtml).join("")
-    : emptyCard("Nenhuma pessoa registrada ainda.");
-
-  const drawerContainer = document.querySelector("#adm-users-list");
-  if (drawerContainer) {
-    drawerContainer.innerHTML = cardsHtml;
-    wireUserRoleSelects(drawerContainer);
-  }
-
   const pageContainer = document.querySelector("#page-users-list");
-  if (pageContainer) {
-    pageContainer.innerHTML = cardsHtml;
-    wireUserRoleSelects(pageContainer);
+  if (!pageContainer) return;
+
+  if (!appState.users.length) {
+    pageContainer.innerHTML = emptyCard("Nenhuma pessoa registrada ainda.");
+    return;
   }
+
+  pageContainer.innerHTML = appState.users.map(buildUserRoleCardHtml).join("");
+  wireUserRoleSelects(pageContainer);
 }
 
 function renderVisitUserFields() {
@@ -928,7 +1024,7 @@ function renderOverview() {
 }
 
 function renderZaqueuWeekChart(visibleZaqueus) {
-  const chart = document.querySelector("#zaqueu-week-chart");
+  const chart = document.querySelector("#zaqueu-week-chart") || document.querySelector(".chart");
   if (!chart) return;
 
   const totalsByWeek = [1, 2, 3, 4, 5].map((weekNum) => {
@@ -954,26 +1050,22 @@ function renderOverviewRank() {
   const container = document.querySelector("#overview-rank");
   if (!container) return;
   const visibleVisits = getVisibleVisits();
-  if (!visibleVisits.length) {
-    container.innerHTML = emptyCard("Sem registros para separar por igreja e cargo ainda.");
-    return;
-  }
 
   const byChurch = Object.entries(CHURCHES).map(([key, church]) => {
     const count = visibleVisits.filter((visit) => visit.churchId === key || visit.church === church.name).length;
     return `<div><strong>${escapeHtml(church.name)} (${escapeHtml(church.pastor)})</strong><span>${count} visitas</span></div>`;
   });
-  const bishops = visibleVisits.filter((visit) => appState.users.find((user) => user.id === visit.visitorId)?.roleId === "bispo").length;
-  const pastors = visibleVisits.filter((visit) => appState.users.find((user) => user.id === visit.visitorId)?.roleId === "pastor").length;
-  const leaders = visibleVisits.filter((visit) => appState.users.find((user) => user.id === visit.visitorId)?.roleId === "lideranca").length;
-  const workers = visibleVisits.filter((visit) => appState.users.find((user) => user.id === visit.visitorId)?.roleId === "obreiro").length;
+  const bishops = appState.users.filter((u) => u.roleId === "bispo").length;
+  const pastors = appState.users.filter((u) => u.roleId === "pastor").length;
+  const leaders = appState.users.filter((u) => u.roleId === "lideranca").length;
+  const workers = appState.users.filter((u) => u.roleId === "obreiro").length;
 
   container.innerHTML = [
     ...byChurch,
-    `<div><strong>Bispos</strong><span>${bishops} registros</span></div>`,
-    `<div><strong>Pastores</strong><span>${pastors} registros</span></div>`,
-    `<div><strong>Liderança</strong><span>${leaders} registros</span></div>`,
-    `<div><strong>Obreiros</strong><span>${workers} registros</span></div>`,
+    `<div><strong>Bispos cadastrados</strong><span>${bishops}</span></div>`,
+    `<div><strong>Pastores cadastrados</strong><span>${pastors}</span></div>`,
+    `<div><strong>Liderança cadastrada</strong><span>${leaders}</span></div>`,
+    `<div><strong>Obreiros cadastrados</strong><span>${workers}</span></div>`,
   ].join("");
 }
 
@@ -999,7 +1091,7 @@ function renderMaterials(filter = "todos") {
             ${
               item.dataUrl
                 ? `<a class="secondary-button" href="${item.dataUrl}" download="${escapeHtml(item.title)}" target="_blank">Abrir / Baixar</a>`
-                : `<button class="secondary-button" type="button" disabled>Arquivo local</button>`
+                : `<button class="secondary-button" type="button" disabled>Arquivo salvo</button>`
             }
           </div>
         </article>
@@ -1013,7 +1105,7 @@ function renderLibrary(category = "todos") {
   if (!container) return;
   const items = appState.libraryItems.filter((item) => category === "todos" || item.category === category);
   if (!items.length) {
-    container.innerHTML = emptyCard("A biblioteca ainda está vazia. Um ADM pode adicionar devocionais, direcionamentos, fotos, PDFs ou links.");
+    container.innerHTML = emptyCard("A biblioteca ainda está vazia. Use o formulário acima para publicar materiais.");
     return;
   }
   container.innerHTML = items
@@ -1033,7 +1125,7 @@ function renderLibrary(category = "todos") {
                 ? `<a class="secondary-button" href="${escapeHtml(item.link)}" target="_blank" rel="noopener noreferrer">Abrir link</a>`
                 : item.dataUrl
                   ? `<a class="secondary-button" href="${item.dataUrl}" download="${escapeHtml(item.fileName || item.title)}" target="_blank">Baixar arquivo</a>`
-                  : `<span class="tag">Informativo</span>`
+                  : `<span class="tag">Disponível</span>`
             }
           </div>
         </article>
@@ -1047,7 +1139,7 @@ function renderNotifications() {
   if (!container) return;
   const visible = getVisibleNotifications();
   if (!visible.length) {
-    container.innerHTML = emptyCard("Nenhuma notificação para o seu perfil no momento.");
+    container.innerHTML = emptyCard("Nenhuma notificação publicada ainda.");
     return;
   }
   container.innerHTML = visible
@@ -1055,7 +1147,7 @@ function renderNotifications() {
       (notification) => `
         <article class="notification-item">
           <div class="tag-row">
-            <span class="tag">${escapeHtml(notification.audience)}</span>
+            <span class="tag">Público: ${escapeHtml(notification.audience || "Todos os usuários")}</span>
             <span class="status-pill">${escapeHtml(notification.date)}</span>
           </div>
           <h3>${escapeHtml(notification.title)}</h3>
@@ -1078,9 +1170,11 @@ function renderCalendar() {
   const firstDay = new Date(year, month - 1, 1);
   const daysInMonth = new Date(year, month, 0).getDate();
   const firstWeekday = firstDay.getDay();
-  const events = appState.calendarEvents
-    .filter((event) => String(event.date || "").slice(0, 7) === monthInput.value)
-    .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+
+  const allEvents = [...(appState.calendarEvents || [])].sort((a, b) =>
+    String(a.date || "").localeCompare(String(b.date || ""))
+  );
+  const monthEvents = allEvents.filter((event) => String(event.date || "").slice(0, 7) === monthInput.value);
 
   const weekdays = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
   const cells = weekdays.map((day) => `<div class="calendar-weekday">${day}</div>`);
@@ -1091,20 +1185,23 @@ function renderCalendar() {
 
   for (let day = 1; day <= daysInMonth; day += 1) {
     const date = `${monthInput.value}-${String(day).padStart(2, "0")}`;
-    const dayEvents = events.filter((event) => event.date === date);
+    const dayEvents = monthEvents.filter((event) => event.date === date);
     cells.push(`
       <div class="calendar-day">
         <strong>${day}</strong>
         ${dayEvents
-          .map((event) => `<span class="calendar-dot">${escapeHtml(event.title || "Evento")}</span>`)
+          .map((event) => `<span class="calendar-dot" title="${escapeHtml(event.title)}">${escapeHtml(event.title || "Evento")}</span>`)
           .join("")}
       </div>
     `);
   }
 
   board.innerHTML = cells.join("");
-  list.innerHTML = events.length
-    ? events
+
+  // Exibe os eventos do mês selecionado; se não houver no mês, mostra todos os eventos futuros/cadastrados
+  const eventsToDisplay = monthEvents.length ? monthEvents : allEvents;
+  list.innerHTML = eventsToDisplay.length
+    ? eventsToDisplay
         .map(
           (event) => `
             <article class="calendar-event">
@@ -1113,13 +1210,13 @@ function renderCalendar() {
                 <span class="tag">${escapeHtml(event.church || "Igreja Sede")}</span>
               </div>
               <strong>${escapeHtml(event.title || "Evento")}</strong>
-              <p>${escapeHtml(event.description || "Programação da igreja.")}</p>
+              <p>${escapeHtml(event.description || "Programação oficial da igreja.")}</p>
               ${event.time ? `<small>Horário: ${escapeHtml(event.time)}</small>` : ""}
             </article>
           `
         )
         .join("")
-    : emptyCard("Nenhum evento cadastrado para este mês.");
+    : emptyCard("Nenhum evento cadastrado ainda. Use o formulário acima para adicionar eventos.");
 }
 
 function updateZaqueuEndDate() {
@@ -1128,13 +1225,6 @@ function updateZaqueuEndDate() {
   if (!startInput || !endInput) return;
   if (!startInput.value) startInput.value = formatDateLocal();
   endInput.value = addWeeks(startInput.value, 5);
-}
-
-function openAdmDrawer(mode = "content") {
-  if (!isAdmin()) return;
-  const drawer = document.querySelector("#adm-drawer-toggle");
-  if (drawer) drawer.checked = true;
-  switchAdmTab(mode);
 }
 
 function readFileAsDataUrl(file) {
@@ -1192,7 +1282,7 @@ function wireAuth() {
     const churchId = normalizeChurchId(form.get("churchId"));
     const church = CHURCHES[churchId] || CHURCHES.sede;
     const hasAnyAdmin = appState.users.some((u) => u.roleId === "adm");
-    const roleId = hasAnyAdmin ? "obreiro" : "adm";
+    const roleId = form.get("roleId") || (hasAnyAdmin ? "obreiro" : "adm");
 
     const user = {
       id: `user_${Date.now()}`,
@@ -1201,7 +1291,7 @@ function wireAuth() {
       loginKey,
       passwordHash: await hashPassword(String(form.get("password"))),
       roleId,
-      role: ROLE_LABELS[roleId],
+      role: ROLE_LABELS[roleId] || "Obreiro",
       churchId,
       church: church.name,
       pastor: church.pastor,
@@ -1240,6 +1330,59 @@ function wireAuth() {
 
 function wireEvents() {
   document.querySelector("#logout-button")?.addEventListener("click", logout);
+
+  // Botão rápido para promover a conta atual a ADM durante testes da faculdade
+  document.querySelector("#promote-self-adm")?.addEventListener("click", async () => {
+    if (!currentUser) return;
+    currentUser.roleId = "adm";
+    currentUser.role = ROLE_LABELS.adm;
+    await saveAppState();
+    window.location.href = "dashboard.html";
+  });
+
+  // Cadastro direto de pessoa com atribuição de cargo pelo painel ADM no Dashboard
+  document.querySelector("#admin-add-user-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    const rawEmail = String(form.get("login") || "").trim();
+    const msgEl = document.querySelector("#admin-add-user-msg");
+
+    if (!isValidEmail(rawEmail)) {
+      if (msgEl) msgEl.textContent = "E-mail inválido.";
+      return;
+    }
+
+    const loginKey = normalizeEmail(rawEmail);
+    if (appState.users.some((u) => normalizeEmail(u.loginKey || u.login) === loginKey)) {
+      if (msgEl) msgEl.textContent = "Este e-mail já está cadastrado!";
+      return;
+    }
+
+    const churchId = normalizeChurchId(form.get("churchId"));
+    const church = CHURCHES[churchId] || CHURCHES.sede;
+    const roleId = form.get("roleId") || "obreiro";
+
+    appState.users.push({
+      id: `user_${Date.now()}`,
+      name: String(form.get("name")).trim(),
+      login: rawEmail.toLowerCase(),
+      loginKey,
+      passwordHash: await hashPassword(String(form.get("password"))),
+      roleId,
+      role: ROLE_LABELS[roleId] || "Obreiro",
+      churchId,
+      church: church.name,
+      pastor: church.pastor,
+      pastorId: church.pastorId,
+      createdAt: new Date().toISOString(),
+    });
+
+    await saveAppState();
+    formElement.reset();
+    if (msgEl) msgEl.textContent = "Pessoa cadastrada e cargo atribuído com sucesso!";
+    renderAll();
+  });
 
   const globalSearch = document.querySelector("#global-search");
   globalSearch?.addEventListener("keydown", (event) => {
@@ -1338,18 +1481,15 @@ function wireEvents() {
   });
 
   document.querySelector("#focus-library-form")?.addEventListener("click", () => {
-    openAdmDrawer("content");
-    window.setTimeout(() => document.querySelector("#library-form input[name='title']")?.focus(), 80);
+    document.querySelector("#library-form input[name='title']")?.focus();
   });
 
   document.querySelector("#focus-notification-form")?.addEventListener("click", () => {
-    openAdmDrawer("notify");
-    window.setTimeout(() => document.querySelector("#notification-form input[name='title']")?.focus(), 80);
+    document.querySelector("#notification-form input[name='title']")?.focus();
   });
 
   document.querySelector("#focus-calendar-form")?.addEventListener("click", () => {
-    openAdmDrawer("calendar");
-    window.setTimeout(() => document.querySelector("#calendar-form input[name='title']")?.focus(), 80);
+    document.querySelector("#calendar-form input[name='title']")?.focus();
   });
 
   document.querySelector("#library-form")?.addEventListener("submit", async (event) => {
@@ -1375,6 +1515,8 @@ function wireEvents() {
     });
     await saveAppState();
     formElement.reset();
+    const fb = document.querySelector("#lib-feedback");
+    if (fb) fb.textContent = "Material publicado com sucesso!";
     renderLibrary();
   });
 
@@ -1397,6 +1539,8 @@ function wireEvents() {
     });
     await saveAppState();
     formElement.reset();
+    const fb = document.querySelector("#notif-feedback");
+    if (fb) fb.textContent = "Notificação publicada para todos!";
     renderNotifications();
   });
 
@@ -1405,10 +1549,11 @@ function wireEvents() {
     if (!isAdmin()) return;
     const formElement = event.currentTarget;
     const form = new FormData(formElement);
+    const eventDate = String(form.get("date") || formatDateLocal());
     appState.calendarEvents.push({
       id: `cal_${Date.now()}`,
       title: form.get("title"),
-      date: form.get("date"),
+      date: eventDate,
       time: form.get("time"),
       church: form.get("church"),
       description: form.get("description"),
@@ -1416,11 +1561,19 @@ function wireEvents() {
     });
     await saveAppState();
     formElement.reset();
+    // Muda o filtro do calendário automaticamente para o mês do evento criado para ele aparecer na hora
+    const monthInput = document.querySelector("#calendar-month");
+    if (monthInput && eventDate) {
+      monthInput.value = eventDate.slice(0, 7);
+    }
+    const fb = document.querySelector("#cal-feedback");
+    if (fb) fb.textContent = "Evento salvo no calendário!";
     renderCalendar();
   });
 }
 
 async function initApp() {
+  injectCriticalFixesCss();
   injectPwaTags();
   const currentPage = getCurrentPage();
   const savedUserId = localStorage.getItem(SESSION_KEY);
@@ -1452,7 +1605,7 @@ async function initApp() {
     return;
   }
 
-  document.body.classList.add("is-authenticated");
+  document.body.classList.add("is-authenticated", "can-dashboard");
   document.body.classList.toggle("is-admin", isAdmin());
   document.body.classList.toggle("can-manage-zaqueu", canManageZaqueu());
 
