@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>APPIGREJA - Meu Perfil</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell" id="app-shell">
+      <main class="main" id="main-content">
+        <section class="screen" id="perfil" aria-labelledby="perfil-title">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Dados Pessoais e Credencial</p>
+              <h2 id="perfil-title">Meu Perfil</h2>
+            </div>
+            <span class="saving-state" id="profile-save-status">Protegido (Acesso restrito à Secretaria/ADM)</span>
+          </div>
+
+          <div class="zaqueu-layout">
+            <!-- Formulário de Dados Pessoais do Usuário Logado -->
+            <section class="panel wide">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">Ficha de Membro</p>
+                  <h3>Meus Dados Cadastrais</h3>
+                </div>
+              </div>
+
+              <form class="stack-form" id="profile-form" style="margin-top: 14px;">
+                <label class="upload-box" style="cursor: pointer; text-align: center;">
+                  <span>📷 Toque aqui para escolher ou tirar sua Foto de Perfil</span>
+                  <input id="profile-photo-input" type="file" accept="image/*" style="display: none;" />
+                </label>
+
+                <div class="form-grid">
+                  <label>
+                    Nome completo
+                    <input id="prof-name" name="name" type="text" required />
+                  </label>
+                  <label>
+                    Nº da Carteira de Membro
+                    <input id="prof-member-card" name="memberCard" type="text" placeholder="Ex: SEDE-2026-001" />
+                  </label>
+                  <label>
+                    CPF (Apenas ADM e Secretaria visualizam)
+                    <input id="prof-cpf" name="cpf" type="text" placeholder="000.000.000-00" maxlength="14" />
+                  </label>
+                  <label>
+                    Data de Aniversário / Nascimento
+                    <input id="prof-birth" name="birthDate" type="date" />
+                  </label>
+                  <label>
+                    Telefone / WhatsApp
+                    <input id="prof-phone" name="phone" type="tel" placeholder="(19) 99999-9999" />
+                  </label>
+                  <label>
+                    Data de Batismo / Membresia
+                    <input id="prof-baptism" name="baptismDate" type="date" />
+                  </label>
+                </div>
+
+                <label>
+                  Endereço Completo (Rua, Nº, Bairro, Cidade - UF, CEP)
+                  <textarea id="prof-address" name="address" rows="3" placeholder="Digite seu endereço residencial completo"></textarea>
+                </label>
+
+                <div class="form-actions">
+                  <span id="profile-feedback" style="font-weight: 800; color: var(--green);"></span>
+                  <button class="primary-button" type="submit">Salvar Meu Perfil</button>
+                </div>
+              </form>
+            </section>
+
+            <!-- Carteira Digital do Membro -->
+            <section class="panel" id="digital-member-card">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">Credencial Digital</p>
+                  <h3>Carteira de Membro</h3>
+                </div>
+              </div>
+              <div id="member-card-preview" style="margin-top: 14px;"></div>
+            </section>
+          </div>
+
+          <!-- Painel Exclusivo para ADM e Secretaria verem todas as fichas -->
+          <section class="panel wide" id="secretaria-members-panel" style="margin-top: 22px; display: none;">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Acesso Confidencial — Exclusivo ADM e Secretaria</p>
+                <h3>Fichas Cadastrais de Todos os Membros (<span id="secretaria-count">0</span>)</h3>
+              </div>
+              <label class="search">
+                <span aria-hidden="true">B</span>
+                <input id="secretaria-search" type="search" placeholder="Buscar por nome, CPF ou carteira..." />
+              </label>
+            </div>
+            <div class="visit-list" id="secretaria-members-list" style="margin-top: 14px;"></div>
+          </section>
+        </section>
+      </main>
+    </div>
+    <script src="app.js"></script>
+  </body>
+</html>

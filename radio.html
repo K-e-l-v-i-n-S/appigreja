@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>APPIGREJA - Rádio Ao Vivo</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell" id="app-shell">
+      <main class="main" id="main-content">
+        <section class="screen" id="radio" aria-labelledby="radio-title">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Transmissão em Tempo Real</p>
+              <h2 id="radio-title">Rádio Ao Vivo</h2>
+            </div>
+            <span class="status-pill" id="radio-status-badge">Verificando transmissão...</span>
+          </div>
+
+          <div class="zaqueu-layout">
+            <!-- Player dos Ouvintes -->
+            <section class="panel wide">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">Sintonia da Igreja</p>
+                  <h3 id="radio-current-title">Aguardando transmissão ao vivo</h3>
+                </div>
+              </div>
+
+              <div id="radio-listener-box" style="margin-top: 14px; padding: 20px; border-radius: 10px; background: linear-gradient(135deg, #18342f, #2f6f5e); color: #ffffff; display: grid; gap: 14px;">
+                <div style="display: flex; align-items: center; gap: 14px;">
+                  <div id="radio-live-indicator" style="width: 18px; height: 18px; border-radius: 50%; background: #9ca3af;"></div>
+                  <div>
+                    <strong id="radio-speaker-name" style="font-size: 18px; display: block;">Ninguém ao vivo no momento</strong>
+                    <span id="radio-speaker-church" style="font-size: 13px; opacity: 0.85;">Assim que o ADM ou líder autorizado entrar ao vivo, o áudio tocará aqui.</span>
+                  </div>
+                </div>
+
+                <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+                  <button class="primary-button" type="button" id="listen-radio-btn" style="background: #f3b743; color: #18342f; font-weight: 900;">
+                    🔊 Conectar Áudio para Ouvir
+                  </button>
+                  <span id="listener-audio-status" style="font-size: 13px; opacity: 0.9;">Toque no botão amarelo para liberar o som no seu celular.</span>
+                </div>
+
+                <audio id="external-audio-player" controls style="width: 100%; display: none;"></audio>
+              </div>
+
+              <!-- Estúdio de Transmissão (Visível APENAS para ADM ou quem o ADM autorizar) -->
+              <div id="radio-broadcaster-studio" style="margin-top: 20px; padding: 18px; border: 2px solid #9bc6bb; border-radius: 10px; background: #f5fbf8; display: none;">
+                <p class="eyebrow">🎙️ Estúdio do Locutor (Você tem permissão para transmitir)</p>
+                <h3 style="margin: 0 0 12px;">Entrar Ao Vivo para Todos os Membros</h3>
+
+                <div class="stack-form">
+                  <label>
+                    Título da Transmissão / Palavra Pastoral
+                    <input id="broadcast-title" type="text" placeholder="Ex: Palavra Pastoral com Bispo Wagner / Oração da Noite" value="Palavra Pastoral e Oração Ao Vivo" />
+                  </label>
+
+                  <label>
+                    Link de Stream Externo (Opcional — deixe em branco para usar o Microfone do seu aparelho)
+                    <input id="broadcast-stream-url" type="url" placeholder="https://... (opcional)" />
+                  </label>
+
+                  <div class="zaqueu-actions">
+                    <button class="primary-button" type="button" id="start-mic-broadcast-btn">
+                      🎙️ Entrar Ao Vivo pelo Microfone
+                    </button>
+                    <button class="secondary-button danger-btn" type="button" id="stop-broadcast-btn" style="display: none;">
+                      ⏹️ Encerrar Transmissão Ao Vivo
+                    </button>
+                  </div>
+                  <small id="broadcaster-feedback" style="color: var(--green-dark); font-weight: 700;"></small>
+                </div>
+              </div>
+            </section>
+
+            <!-- Chat / Pedidos de Oração da Rádio -->
+            <section class="panel">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">Interação Ao Vivo</p>
+                  <h3>Pedidos de Oração e Avisos</h3>
+                </div>
+              </div>
+              <form class="stack-form" id="radio-chat-form" style="margin-top: 12px; margin-bottom: 14px;">
+                <input name="text" type="text" placeholder="Envie um Amém ou pedido de oração..." required />
+                <button class="primary-button" type="submit">Enviar Mensagem</button>
+              </form>
+              <div class="visit-list" id="radio-chat-list" style="max-height: 360px; overflow-y: auto;"></div>
+            </section>
+          </div>
+        </section>
+      </main>
+    </div>
+    <script src="app.js"></script>
+  </body>
+</html>
