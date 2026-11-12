@@ -2,7 +2,7 @@ const STORAGE_KEY = "appigreja_prototype_state_v1";
 const SESSION_KEY = "appigreja_prototype_session_v1";
 
 // Se usar o Firebase Realtime Database, cole a URL aqui (ex: "https://appigreja-default-rtdb.firebaseio.com")
-const CLOUD_DB_URL = "https://k-e-l-v-i-n-s.github.io/appigreja/";
+const CLOUD_DB_URL = "https://appigreja-1f504-default-rtdb.firebaseio.com/";
 
 const CHURCHES = {
   sede: { name: "Igreja Sede", pastor: "Bispo Wagner", pastorId: "bispo-wagner" },
