@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>APPIGREJA - Nova Visita</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell" id="app-shell">
+      <main class="main" id="main-content">
+        <section class="screen" id="nova-visita" aria-labelledby="nova-visita-title">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Registro rápido</p>
+              <h2 id="nova-visita-title">Nova visita</h2>
+            </div>
+            <span class="saving-state" id="saving-state">Data selecionável</span>
+          </div>
+
+          <form class="visit-form" id="visit-form">
+            <input id="visit-worker-id" type="hidden" name="workerId" />
+            <input id="visit-church-id" type="hidden" name="churchId" />
+            <input id="visit-role-id" type="hidden" name="roleId" />
+
+            <div class="form-grid">
+              <label>
+                Data da visita
+                <input id="visit-date" name="date" type="date" required />
+              </label>
+              <label>
+                Visitante logado
+                <input id="visit-worker-name" name="worker" type="text" readonly />
+              </label>
+              <label>
+                Igreja vinculada
+                <input id="visit-church-name" name="church" type="text" readonly />
+              </label>
+              <label>
+                Pessoa/família visitada
+                <input name="visited" type="text" placeholder="Nome da pessoa ou família visitada" required />
+              </label>
+            </div>
+
+            <label>
+              Resumo da visita
+              <textarea name="summary" rows="7" placeholder="Escreva o essencial: quem foi visitado, como foi recebido, o que ficou combinado e qualquer observação pastoral importante." required></textarea>
+            </label>
+
+            <div class="form-actions">
+              <button class="secondary-button" type="reset">Limpar</button>
+              <button class="primary-button" type="submit">Salvar visita</button>
+            </div>
+          </form>
+        </section>
+      </main>
+    </div>
+    <script src="app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "name": "APPIGREJA - Cuidado e Zaqueus",
+  "short_name": "APPIGREJA",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#18342f",
+  "theme_color": "#2f6f5e",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/2913/2913465.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

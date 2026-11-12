@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>APPIGREJA - Calendário Igreja</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell" id="app-shell">
+      <main class="main" id="main-content">
+        <section class="screen" id="calendario" aria-labelledby="calendario-title">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Agenda mensal</p>
+              <h2 id="calendario-title">Calendário Igreja</h2>
+            </div>
+            <div class="filter-row">
+              <label class="month-filter">
+                Mês
+                <input id="calendar-month" type="month" />
+              </label>
+              <button class="primary-button admin-only" type="button" id="focus-calendar-form">Novo evento</button>
+            </div>
+          </div>
+
+          <div class="calendar-layout">
+            <section class="panel wide">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">Secretaria sede</p>
+                  <h3>Programação do mês</h3>
+                </div>
+                <span class="saving-state">Sincronizado</span>
+              </div>
+              <div class="calendar-board" id="calendar-board"></div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">Eventos</p>
+                  <h3>Lista do mês</h3>
+                </div>
+              </div>
+              <div class="calendar-event-list" id="calendar-event-list"></div>
+            </section>
+          </div>
+        </section>
+      </main>
+    </div>
+    <script src="app.js"></script>
+  </body>
+</html>

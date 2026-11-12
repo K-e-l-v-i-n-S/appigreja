@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>APPIGREJA - Visitas Realizadas</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell" id="app-shell">
+      <main class="main" id="main-content">
+        <section class="screen" id="visitas" aria-labelledby="visitas-title">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Histórico de campo</p>
+              <h2 id="visitas-title">Visitas realizadas</h2>
+            </div>
+            <a class="primary-button" href="nova-visita.html">Nova visita</a>
+          </div>
+
+          <div class="toolbar">
+            <label class="search inline">
+              <span aria-hidden="true">B</span>
+              <input id="visit-search" type="search" placeholder="Nome do visitante ou visitado" />
+            </label>
+            <select id="church-filter" aria-label="Filtrar por igreja">
+              <option value="todos">Todas as igrejas</option>
+              <option value="sede">Igreja Sede</option>
+              <option value="campineiro">Igreja Campineiro</option>
+              <option value="mogi">Igreja Mogi Guaçu</option>
+            </select>
+            <select id="worker-filter" aria-label="Filtrar por obreiro">
+              <option value="todos">Todos os obreiros</option>
+            </select>
+            <select id="pastor-filter" aria-label="Filtrar por liderança pastoral">
+              <option value="todos">Todos os pastores/bispo</option>
+              <option value="bispo-wagner">Bispo Wagner</option>
+              <option value="pra-lindamir">Pastora Lindamir</option>
+              <option value="pr-paulo">Pastor Paulo</option>
+            </select>
+          </div>
+
+          <div class="visit-list" id="visit-results"></div>
+        </section>
+      </main>
+    </div>
+    <script src="app.js"></script>
+  </body>
+</html>

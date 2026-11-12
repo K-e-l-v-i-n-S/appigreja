@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>APPIGREJA - Visão Geral</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell" id="app-shell">
+      <main class="main" id="main-content">
+        <section class="screen" id="visao" aria-labelledby="visao-title">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Liderança</p>
+              <h2 id="visao-title">Visão Geral</h2>
+            </div>
+          </div>
+
+          <div class="metric-grid compact">
+            <article class="metric-card">
+              <span>Visitas realizadas</span>
+              <strong id="overview-visits">0</strong>
+              <small>Registros do mês no seu escopo</small>
+            </article>
+            <article class="metric-card">
+              <span>Visitas antes dos cultos</span>
+              <strong id="overview-zaqueu-visits">0</strong>
+              <small>Somente semana atual</small>
+            </article>
+            <article class="metric-card">
+              <span>Visitantes nos cultos</span>
+              <strong id="overview-cult-visitors">0</strong>
+              <small>Somados por semana</small>
+            </article>
+            <article class="metric-card">
+              <span>Frequentando semanalmente</span>
+              <strong id="overview-weekly-people">0</strong>
+              <small>Pessoas recorrentes nos Zaqueus</small>
+            </article>
+          </div>
+
+          <div class="leader-grid">
+            <section class="panel wide">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">Zaqueu</p>
+                  <h3>Frequência acumulada por semana</h3>
+                </div>
+              </div>
+              <div class="chart" id="zaqueu-week-chart" aria-label="Gráfico semanal de Zaqueus"></div>
+              <div class="chart-labels">
+                <span>Sem 1</span>
+                <span>Sem 2</span>
+                <span>Sem 3</span>
+                <span>Sem 4</span>
+                <span>Sem 5</span>
+              </div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">Separação por ID</p>
+                  <h3>Igrejas e cargos</h3>
+                </div>
+              </div>
+              <div class="rank-list" id="overview-rank"></div>
+            </section>
+          </div>
+        </section>
+      </main>
+    </div>
+    <script src="app.js"></script>
+  </body>
+</html>

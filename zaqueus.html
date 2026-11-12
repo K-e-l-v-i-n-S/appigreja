@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>APPIGREJA - Zaqueus</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell" id="app-shell">
+      <main class="main" id="main-content">
+        <section class="screen" id="zaqueus" aria-labelledby="zaqueus-title">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Núcleos abertos</p>
+              <h2 id="zaqueus-title">Zaqueus</h2>
+            </div>
+            <a class="primary-button zaqueu-leader-only" href="#novo-zaqueu">Criar Novo Zaqueu</a>
+          </div>
+
+          <div class="zaqueu-layout">
+            <section class="panel wide">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">Controle semanal</p>
+                  <h3>Zaqueus em andamento</h3>
+                </div>
+              </div>
+              <div class="zaqueu-list" id="zaqueu-list"></div>
+            </section>
+
+            <section class="panel zaqueu-leader-only" id="novo-zaqueu">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">Abertura (Liderança+)</p>
+                  <h3>Novo Zaqueu</h3>
+                </div>
+              </div>
+              <form class="stack-form" id="zaqueu-form">
+                <label>
+                  Endereço completo
+                  <textarea name="address" rows="3" placeholder="Rua, número, bairro, cidade" required></textarea>
+                </label>
+                <div class="form-grid one">
+                  <label>
+                    Data de início
+                    <input id="zaqueu-start" name="start" type="date" required />
+                  </label>
+                  <label>
+                    Data de término
+                    <input id="zaqueu-end" name="end" type="date" readonly />
+                  </label>
+                </div>
+                <label>
+                  Anfitriões
+                  <input name="hosts" type="text" placeholder="Nomes dos anfitriões" required />
+                </label>
+                <label>
+                  Responsáveis
+                  <input name="leaders" type="text" placeholder="Obreiros ou liderança responsável" required />
+                </label>
+                <label>
+                  Pessoas iniciando sem responsáveis/anfitriões
+                  <input name="initialPeople" type="number" min="0" value="0" />
+                </label>
+                <div class="form-grid one">
+                  <label>
+                    Dia da semana
+                    <select name="weekday">
+                      <option>Domingo</option>
+                      <option>Segunda-feira</option>
+                      <option>Terça-feira</option>
+                      <option>Quarta-feira</option>
+                      <option>Quinta-feira</option>
+                      <option>Sexta-feira</option>
+                      <option>Sábado</option>
+                    </select>
+                  </label>
+                  <label>
+                    Horário
+                    <input name="time" type="time" value="19:30" />
+                  </label>
+                </div>
+                <button class="primary-button" type="submit">Criar Novo Zaqueu</button>
+              </form>
+            </section>
+          </div>
+
+          <section class="panel wide material-panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Material do Zaqueu</p>
+                <h3>Fotos e PDFs</h3>
+              </div>
+              <select id="zaqueu-material-filter" aria-label="Filtrar material do Zaqueu">
+                <option value="todos">Todos</option>
+                <option value="pdf">PDFs</option>
+                <option value="foto">Fotos</option>
+              </select>
+            </div>
+            <label class="upload-box">
+              <span>Subir arquivos do Zaqueu (até 1.5MB)</span>
+              <input id="zaqueu-files" type="file" multiple accept=".pdf,image/*" />
+            </label>
+            <div class="content-card-grid" id="zaqueu-materials"></div>
+          </section>
+        </section>
+      </main>
+    </div>
+    <script src="app.js"></script>
+  </body>
+</html>

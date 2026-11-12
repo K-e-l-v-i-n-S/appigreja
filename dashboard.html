@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>APPIGREJA - Dashboard</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell" id="app-shell">
+      <main class="main" id="main-content">
+        <section class="screen" id="dashboard" aria-labelledby="dashboard-title">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Resumo do mês</p>
+              <h2 id="dashboard-title">Dashboard</h2>
+            </div>
+            <div class="filter-row">
+              <a class="primary-button" href="nova-visita.html">Nova visita</a>
+            </div>
+          </div>
+
+          <div class="metric-grid compact">
+            <article class="metric-card">
+              <span>Visitas no mês</span>
+              <strong id="metric-month-visits">0</strong>
+              <small>Registros visíveis no seu escopo</small>
+            </article>
+            <article class="metric-card">
+              <span>Minhas visitas</span>
+              <strong id="metric-my-visits">0</strong>
+              <small id="metric-my-visits-label">Usuário logado</small>
+            </article>
+            <article class="metric-card">
+              <span>Igrejas com visitas</span>
+              <strong id="metric-active-churches">0</strong>
+              <small>Separação por ID interno</small>
+            </article>
+            <article class="metric-card">
+              <span>Visitas antes do Zaqueu</span>
+              <strong id="metric-zaqueu-visits">0</strong>
+              <small>Soma semanal dos núcleos ativos</small>
+            </article>
+          </div>
+
+          <section class="panel wide dashboard-chart-panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Comparativo</p>
+                <h3>Visitas por igreja e mês</h3>
+              </div>
+              <div class="chart-legend" aria-label="Legenda do gráfico">
+                <span><b class="legend-dot sede"></b>Igreja Sede</span>
+                <span><b class="legend-dot norte"></b>Igreja Campineiro</span>
+                <span><b class="legend-dot leste"></b>Igreja Mogi Guaçu</span>
+              </div>
+            </div>
+            <div class="comparison-chart-wrap">
+              <div class="comparison-chart" id="church-month-chart" aria-label="Comparativo mensal de visitas por igreja"></div>
+            </div>
+          </section>
+
+          <section class="panel wide">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Lista de visitas</p>
+                <h3>Registros mais recentes</h3>
+              </div>
+              <a class="text-button" href="visitas.html">Ver todas</a>
+            </div>
+            <div class="visit-list" id="dashboard-visits"></div>
+          </section>
+        </section>
+      </main>
+    </div>
+    <script src="app.js"></script>
+  </body>
+</html>

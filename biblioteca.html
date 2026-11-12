@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>APPIGREJA - Biblioteca</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell" id="app-shell">
+      <main class="main" id="main-content">
+        <section class="screen" id="biblioteca" aria-labelledby="biblioteca-title">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Conteúdos para baixar</p>
+              <h2 id="biblioteca-title">Biblioteca</h2>
+            </div>
+            <button class="primary-button admin-only" type="button" id="focus-library-form">Adicionar conteúdo ADM</button>
+          </div>
+
+          <section class="panel wide library-panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Disponíveis</p>
+                <h3>Devocionais e direcionamentos</h3>
+              </div>
+              <div class="segmented" role="group" aria-label="Categorias da biblioteca">
+                <button class="active" type="button" data-library-category="todos">Todos</button>
+                <button type="button" data-library-category="devocional">Devocionais</button>
+                <button type="button" data-library-category="direcionamento">Direcionamentos</button>
+                <button type="button" data-library-category="link">Links</button>
+              </div>
+            </div>
+            <div class="content-card-grid" id="library-grid"></div>
+          </section>
+        </section>
+      </main>
+    </div>
+    <script src="app.js"></script>
+  </body>
+</html>

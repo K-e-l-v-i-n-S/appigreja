@@ -1,0 +1,2810 @@
+﻿<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>APPIGREJA - Protótipo</title>
+    <style>
+:root {
+  color-scheme: light;
+  --bg: #f4f6f3;
+  --surface: #ffffff;
+  --surface-soft: #eef4f1;
+  --ink: #1f2a27;
+  --muted: #65746f;
+  --line: #dce5e0;
+  --green: #2f6f5e;
+  --green-dark: #18342f;
+  --teal: #0f7d83;
+  --gold: #b37b16;
+  --red: #b33a30;
+  --blue: #305f9e;
+  --shadow: 0 20px 60px rgba(31, 42, 39, 0.11);
+  --radius: 8px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--ink);
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+body:not(.is-authenticated) .app-shell,
+body:not(.is-authenticated) .adm-chat {
+  display: none;
+}
+
+body.is-authenticated .auth-screen {
+  display: none;
+}
+
+body:not(.is-admin) .admin-only {
+  display: none !important;
+}
+
+body:not(.can-dashboard) .dashboard-only {
+  display: none !important;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button,
+label,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button {
+  cursor: pointer;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.auth-screen {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    linear-gradient(135deg, rgba(47, 111, 94, 0.12), rgba(15, 125, 131, 0.1)),
+    var(--bg);
+}
+
+.auth-card {
+  width: min(480px, 100%);
+  display: grid;
+  gap: 18px;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.auth-brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.auth-brand h1 {
+  margin: 0;
+  font-size: 34px;
+}
+
+.auth-brand span,
+.auth-card small {
+  color: var(--muted);
+}
+
+.auth-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #f8faf9;
+}
+
+.auth-tabs button {
+  min-height: 38px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.auth-tabs button.active {
+  background: var(--green);
+  color: #ffffff;
+}
+
+.auth-form {
+  display: none;
+  gap: 14px;
+}
+
+.auth-form.active {
+  display: grid;
+}
+
+.auth-form label {
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.auth-message {
+  min-height: 20px;
+  margin: 0;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.auth-message[data-tone="error"] {
+  color: var(--red);
+}
+
+.auth-message[data-tone="success"] {
+  color: var(--green);
+}
+
+.app-shell {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+.screen-toggle {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  min-height: 0 !important;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 24px 18px;
+  background: var(--green-dark);
+  color: #f6fbf8;
+}
+
+.brand,
+.profile-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brand-mark,
+.avatar {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  border-radius: var(--radius);
+  background: #f3b743;
+  color: var(--green-dark);
+  font-weight: 800;
+}
+
+.brand span,
+.profile-card span {
+  display: block;
+  color: rgba(246, 251, 248, 0.72);
+  font-size: 12px;
+}
+
+.nav-list {
+  display: grid;
+  gap: 8px;
+}
+
+.nav-item {
+  width: 100%;
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  background: transparent;
+  color: rgba(246, 251, 248, 0.78);
+  cursor: pointer;
+  text-align: left;
+  user-select: none;
+}
+
+.nav-item:hover,
+#tab-dashboard:checked ~ .sidebar .nav-item[for="tab-dashboard"],
+#tab-visitas:checked ~ .sidebar .nav-item[for="tab-visitas"],
+#tab-nova-visita:checked ~ .sidebar .nav-item[for="tab-nova-visita"],
+#tab-zaqueus:checked ~ .sidebar .nav-item[for="tab-zaqueus"],
+#tab-calendario:checked ~ .sidebar .nav-item[for="tab-calendario"],
+#tab-biblioteca:checked ~ .sidebar .nav-item[for="tab-biblioteca"],
+#tab-visao:checked ~ .sidebar .nav-item[for="tab-visao"],
+#tab-notificacoes:checked ~ .sidebar .nav-item[for="tab-notificacoes"] {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+}
+
+.icon {
+  width: 22px;
+  text-align: center;
+  font-weight: 800;
+}
+
+.profile-card {
+  margin-top: auto;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.profile-card > div {
+  min-width: 0;
+}
+
+.avatar {
+  width: 38px;
+  height: 38px;
+  flex-basis: 38px;
+  background: #e9f5f0;
+  font-size: 13px;
+}
+
+.profile-logout {
+  min-height: 30px;
+  margin-left: auto;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: var(--radius);
+  padding: 5px 8px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.main {
+  min-width: 0;
+  padding: 28px;
+}
+
+.topbar,
+.section-heading,
+.panel-header,
+.toolbar,
+.form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.topbar {
+  margin-bottom: 28px;
+}
+
+.topbar h1,
+.section-heading h2,
+.panel h3 {
+  margin: 0;
+}
+
+.topbar h1 {
+  font-size: clamp(28px, 4vw, 42px);
+}
+
+.eyebrow {
+  margin: 0 0 4px;
+  color: var(--teal);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.topbar-actions,
+.filter-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.search {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--muted);
+}
+
+.search input {
+  width: min(320px, 48vw);
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+}
+
+.search.inline {
+  flex: 1 1 260px;
+}
+
+.search.inline input {
+  width: 100%;
+}
+
+.primary-button,
+.secondary-button,
+.ghost-button,
+.text-button,
+.chip,
+.segmented button {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  padding: 8px 12px;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: center;
+}
+
+.primary-button {
+  background: var(--green);
+  color: #ffffff;
+}
+
+.primary-button:hover {
+  background: #214f45;
+}
+
+.secondary-button,
+.ghost-button {
+  border-color: var(--line);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.text-button {
+  border: 0;
+  background: transparent;
+  color: var(--teal);
+}
+
+.chip {
+  border-color: var(--line);
+  background: var(--surface);
+  color: var(--muted);
+}
+
+.chip.active {
+  border-color: #9bc6bb;
+  background: #e4f3ef;
+  color: var(--green-dark);
+}
+
+.screen {
+  display: none;
+}
+
+#tab-dashboard:checked ~ .main #dashboard,
+#tab-visitas:checked ~ .main #visitas,
+#tab-nova-visita:checked ~ .main #nova-visita,
+#tab-zaqueus:checked ~ .main #zaqueus,
+#tab-calendario:checked ~ .main #calendario,
+#tab-biblioteca:checked ~ .main #biblioteca,
+#tab-visao:checked ~ .main #visao,
+#tab-notificacoes:checked ~ .main #notificacoes {
+  display: block;
+}
+
+.section-heading {
+  margin-bottom: 18px;
+}
+
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(170px, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.metric-card,
+.panel {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.metric-card {
+  min-height: 132px;
+  display: grid;
+  align-content: space-between;
+  padding: 16px;
+}
+
+.metric-card span,
+.metric-card small {
+  color: var(--muted);
+}
+
+.metric-card strong {
+  font-size: 36px;
+  line-height: 1;
+}
+
+.panel {
+  padding: 18px;
+}
+
+.dashboard-chart-panel {
+  margin-bottom: 18px;
+}
+
+.wide {
+  min-width: 0;
+}
+
+.visit-list,
+.zaqueu-list,
+.rank-list,
+.notification-list {
+  display: grid;
+  gap: 12px;
+}
+
+.visit-item,
+.zaqueu-card,
+.notification-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fbfdfc;
+}
+
+.visit-item h3,
+.visit-item p,
+.zaqueu-card h3,
+.zaqueu-card p,
+.notification-item p {
+  margin: 0;
+}
+
+.visit-item p,
+.zaqueu-card p,
+.notification-item p {
+  color: var(--muted);
+}
+
+.meta-row,
+.tag-row,
+.stat-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.meta-row {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.tag,
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  border-radius: 999px;
+  padding: 3px 8px;
+  background: var(--surface-soft);
+  color: var(--green-dark);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.status-pill {
+  color: var(--blue);
+  background: #e8f0fb;
+}
+
+.chart-legend {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.chart-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.legend-dot.sede,
+.bar.sede {
+  background: var(--green);
+}
+
+.legend-dot.norte,
+.bar.norte {
+  background: var(--teal);
+}
+
+.legend-dot.leste,
+.bar.leste {
+  background: var(--gold);
+}
+
+.comparison-chart-wrap {
+  overflow-x: auto;
+  padding: 8px 2px 0;
+}
+
+.comparison-chart {
+  min-width: 680px;
+  height: 290px;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(92px, 1fr));
+  gap: 16px;
+  align-items: end;
+  padding: 18px 10px 4px;
+  border-radius: var(--radius);
+  background:
+    linear-gradient(to top, rgba(220, 229, 224, 0.85) 1px, transparent 1px) 0 0 / 100% 25%,
+    #fbfdfc;
+}
+
+.month-group {
+  height: 100%;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: 10px;
+  align-items: end;
+  text-align: center;
+}
+
+.bar-set {
+  height: 230px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 7px;
+  align-items: end;
+}
+
+.bar {
+  min-height: 28px;
+  display: grid;
+  align-items: start;
+  justify-items: center;
+  border-radius: 7px 7px 0 0;
+  color: #ffffff;
+  box-shadow: 0 10px 24px rgba(31, 42, 39, 0.12);
+}
+
+.bar.zero {
+  min-height: 0;
+  box-shadow: none;
+  opacity: 0.35;
+}
+
+.bar.zero b {
+  display: none;
+}
+
+.bar b {
+  margin-top: 7px;
+  font-size: 12px;
+}
+
+.month-group > strong {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.toolbar {
+  margin-bottom: 16px;
+  align-items: stretch;
+  flex-wrap: wrap;
+}
+
+select,
+input,
+textarea {
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 9px 11px;
+  background: var(--surface);
+  color: var(--ink);
+}
+
+input[readonly] {
+  color: var(--muted);
+  background: #f8faf9;
+}
+
+textarea {
+  resize: vertical;
+}
+
+.visit-form,
+.stack-form {
+  display: grid;
+  gap: 16px;
+}
+
+.visit-form {
+  max-width: 980px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.form-grid.one {
+  grid-template-columns: 1fr 1fr;
+}
+
+.visit-form label,
+.stack-form label {
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.saving-state {
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #fff3d9;
+  color: #7b570f;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.zaqueu-layout,
+.library-layout,
+.calendar-layout,
+.leader-grid,
+.notification-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.85fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.library-panel .content-card-grid {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.month-filter {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.calendar-board {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(82px, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.calendar-weekday,
+.calendar-day {
+  border-radius: var(--radius);
+}
+
+.calendar-weekday {
+  padding: 8px;
+  background: var(--surface-soft);
+  color: var(--green-dark);
+  font-size: 12px;
+  font-weight: 900;
+  text-align: center;
+}
+
+.calendar-day {
+  min-height: 96px;
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  background: #fbfdfc;
+}
+
+.calendar-day.empty {
+  background: transparent;
+  border-color: transparent;
+}
+
+.calendar-day strong {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.calendar-dot {
+  display: block;
+  padding: 5px 6px;
+  border-radius: 6px;
+  background: #e4f3ef;
+  color: var(--green-dark);
+  font-size: 11px;
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.calendar-event-list {
+  display: grid;
+  gap: 10px;
+}
+
+.calendar-event {
+  display: grid;
+  gap: 5px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fbfdfc;
+}
+
+.calendar-event strong,
+.calendar-event p {
+  margin: 0;
+}
+
+.calendar-event p {
+  color: var(--muted);
+}
+
+.zaqueu-card {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.zaqueu-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.week-boxes {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(110px, 1fr));
+  gap: 10px;
+}
+
+.week-box {
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #ffffff;
+}
+
+.week-box span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.week-box strong {
+  font-size: 24px;
+}
+
+.material-panel {
+  margin-top: 18px;
+}
+
+.upload-box {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0;
+  padding: 14px;
+  border: 1px dashed #9bc6bb;
+  border-radius: var(--radius);
+  background: #f5fbf8;
+  color: var(--green-dark);
+  font-weight: 800;
+}
+
+.segmented {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow-x: auto;
+}
+
+.segmented button {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.segmented button.active {
+  background: var(--green);
+  color: #ffffff;
+}
+
+.content-card-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.content-card {
+  display: grid;
+  gap: 12px;
+  min-height: 210px;
+  overflow: hidden;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.content-art {
+  min-height: 76px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius);
+  background:
+    linear-gradient(135deg, rgba(47, 111, 94, 0.18), rgba(15, 125, 131, 0.12)),
+    #f1f7f4;
+  color: var(--green-dark);
+  font-size: 26px;
+  font-weight: 900;
+}
+
+.content-card h3,
+.content-card p {
+  margin: 0;
+}
+
+.content-card p,
+.content-card small {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.content-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: auto;
+}
+
+.chart {
+  height: 260px;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  align-items: end;
+  gap: 12px;
+  padding-top: 18px;
+}
+
+.chart span {
+  display: grid;
+  align-items: start;
+  justify-items: center;
+  min-height: 36px;
+  border-radius: 8px 8px 0 0;
+  background: linear-gradient(180deg, #2f6f5e, #0f7d83);
+  color: #ffffff;
+}
+
+.chart b {
+  margin-top: 8px;
+  font-size: 13px;
+}
+
+.chart-labels {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+.rank-list div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fbfdfc;
+}
+
+.rank-list span {
+  color: var(--muted);
+}
+
+.notification-item {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.empty-card {
+  border-style: dashed;
+  background: #f8faf9;
+}
+
+.empty-card p {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.adm-toggle,
+.adm-mode {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  min-height: 0 !important;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.adm-chat {
+  position: fixed;
+  right: 22px;
+  bottom: 22px;
+  z-index: 20;
+}
+
+.adm-fab {
+  width: 64px;
+  height: 64px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--green);
+  color: #ffffff;
+  box-shadow: 0 18px 38px rgba(31, 42, 39, 0.28);
+  cursor: pointer;
+  font-weight: 900;
+}
+
+.adm-panel {
+  width: min(390px, calc(100vw - 28px));
+  max-height: min(720px, calc(100vh - 44px));
+  display: none;
+  gap: 14px;
+  overflow: auto;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: 0 24px 70px rgba(31, 42, 39, 0.24);
+}
+
+#adm-drawer-toggle:checked ~ .adm-chat .adm-fab {
+  display: none;
+}
+
+#adm-drawer-toggle:checked ~ .adm-chat .adm-panel {
+  display: grid;
+}
+
+.adm-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.adm-header h3 {
+  margin: 0;
+}
+
+.adm-minimize {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--radius);
+  padding: 6px 10px;
+  background: var(--surface-soft);
+  color: var(--green-dark);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.adm-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #f8faf9;
+}
+
+.adm-tabs label {
+  min-height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  color: var(--muted);
+  cursor: pointer;
+  font-weight: 800;
+}
+
+#adm-mode-content:checked ~ .adm-tabs label[for="adm-mode-content"],
+#adm-mode-notify:checked ~ .adm-tabs label[for="adm-mode-notify"] {
+  background: var(--green);
+  color: #ffffff;
+}
+
+.adm-content-form,
+.adm-notify-form {
+  display: none;
+}
+
+#adm-mode-content:checked ~ .adm-content-form,
+#adm-mode-notify:checked ~ .adm-notify-form {
+  display: grid;
+}
+
+.adm-panel .primary-button,
+.adm-panel .secondary-button {
+  width: 100%;
+}
+
+@media (max-width: 1180px) {
+  .metric-grid,
+  .content-card-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .zaqueu-layout,
+  .library-layout,
+  .calendar-layout,
+  .leader-grid,
+  .notification-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 820px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    position: static;
+    height: auto;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 14px;
+    padding: 16px;
+  }
+
+  .brand {
+    min-width: 0;
+  }
+
+  .profile-card {
+    display: flex;
+    width: auto;
+    max-width: 220px;
+    margin-top: 0;
+    padding: 8px 10px;
+    gap: 8px;
+  }
+
+  .profile-card .avatar {
+    width: 32px;
+    height: 32px;
+    flex-basis: 32px;
+    font-size: 11px;
+  }
+
+  .profile-card div {
+    min-width: 0;
+  }
+
+  .profile-card strong,
+  .profile-card span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .profile-card strong {
+    display: block;
+    max-width: 118px;
+    font-size: 13px;
+  }
+
+  .profile-card span {
+    max-width: 118px;
+    font-size: 11px;
+  }
+
+  .profile-logout {
+    min-height: 28px;
+    padding: 4px 7px;
+  }
+
+  .nav-list {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(4, minmax(120px, 1fr));
+    overflow-x: auto;
+  }
+
+  .nav-item {
+    justify-content: center;
+    white-space: nowrap;
+  }
+
+  .main {
+    padding: 18px;
+  }
+
+  .topbar,
+  .section-heading,
+  .panel-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .topbar-actions,
+  .search,
+  .ghost-button,
+  .primary-button,
+  .secondary-button {
+    width: 100%;
+  }
+
+  .metric-grid,
+  .form-grid,
+  .form-grid.one,
+  .content-card-grid,
+  .week-boxes {
+    grid-template-columns: 1fr;
+  }
+
+  .comparison-chart {
+    min-width: 620px;
+  }
+
+  .calendar-board {
+    min-width: 680px;
+  }
+
+  .calendar-layout .wide {
+    overflow-x: auto;
+  }
+
+  .visit-item {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .sidebar {
+    grid-template-columns: minmax(0, 1fr) minmax(104px, auto);
+    padding: 14px;
+  }
+
+  .brand {
+    align-items: flex-start;
+  }
+
+  .brand-mark {
+    width: 38px;
+    height: 38px;
+    flex-basis: 38px;
+  }
+
+  .brand strong {
+    font-size: 14px;
+  }
+
+  .brand span {
+    font-size: 11px;
+  }
+
+  .profile-card {
+    padding: 7px;
+  }
+
+  .profile-card .avatar {
+    display: none;
+  }
+
+  .profile-card strong,
+  .profile-card span {
+    max-width: 84px;
+  }
+
+  .nav-list {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .metric-card strong {
+    font-size: 30px;
+  }
+
+  .form-actions {
+    flex-direction: column-reverse;
+  }
+
+  .adm-chat {
+    right: 12px;
+    bottom: 12px;
+  }
+
+  .adm-fab {
+    width: 58px;
+    height: 58px;
+  }
+
+  .adm-panel {
+    width: calc(100vw - 24px);
+    max-height: calc(100vh - 24px);
+  }
+}
+
+</style>
+  </head>
+  <body>
+    <section class="auth-screen" id="auth-screen" aria-labelledby="auth-title">
+      <div class="auth-card">
+        <div class="auth-brand">
+          <div class="brand-mark" aria-hidden="true">AI</div>
+          <div>
+            <p class="eyebrow">Protótipo local</p>
+            <h1 id="auth-title">APPIGREJA</h1>
+            <span>Entre ou cadastre um usuário para testar neste aparelho.</span>
+          </div>
+        </div>
+
+        <div class="auth-tabs" role="group" aria-label="Escolher acesso">
+          <button class="active" type="button" id="show-login">Entrar</button>
+          <button type="button" id="show-register">Cadastrar</button>
+        </div>
+
+        <form class="auth-form active" id="login-form">
+          <label>
+            E-mail ou telefone
+            <input name="login" type="text" autocomplete="username" required />
+          </label>
+          <label>
+            Senha
+            <input name="password" type="password" autocomplete="current-password" required />
+          </label>
+          <button class="primary-button" type="submit">Entrar</button>
+        </form>
+
+        <form class="auth-form" id="register-form">
+          <label>
+            Nome completo
+            <input name="name" type="text" autocomplete="name" required />
+          </label>
+          <label>
+            E-mail ou telefone
+            <input name="login" type="text" autocomplete="username" required />
+          </label>
+          <label>
+            Senha
+            <input name="password" type="password" autocomplete="new-password" minlength="4" required />
+          </label>
+          <div class="form-grid one">
+            <label>
+              Igreja
+              <select name="churchId">
+                <option value="sede">Igreja Sede</option>
+                <option value="norte">Igreja Norte</option>
+                <option value="leste">Igreja Leste</option>
+              </select>
+            </label>
+            <label>
+              Perfil
+              <select name="roleId">
+                <option value="obreiro">Obreiro</option>
+                <option value="lideranca">Liderança</option>
+                <option value="bispo">Bispo</option>
+                <option value="pastor">Pastor</option>
+                <option value="adm">Administrador</option>
+              </select>
+            </label>
+          </div>
+          <button class="primary-button" type="submit">Criar cadastro</button>
+        </form>
+
+        <p class="auth-message" id="auth-message"></p>
+        <small>Os dados deste protótipo ficam salvos apenas neste navegador/aparelho.</small>
+      </div>
+    </section>
+
+    <div class="app-shell">
+      <input class="screen-toggle" type="radio" name="screen-toggle" id="tab-dashboard" checked />
+      <input class="screen-toggle" type="radio" name="screen-toggle" id="tab-visitas" />
+      <input class="screen-toggle" type="radio" name="screen-toggle" id="tab-nova-visita" />
+      <input class="screen-toggle" type="radio" name="screen-toggle" id="tab-zaqueus" />
+      <input class="screen-toggle" type="radio" name="screen-toggle" id="tab-calendario" />
+      <input class="screen-toggle" type="radio" name="screen-toggle" id="tab-biblioteca" />
+      <input class="screen-toggle" type="radio" name="screen-toggle" id="tab-visao" />
+      <input class="screen-toggle" type="radio" name="screen-toggle" id="tab-notificacoes" />
+
+      <aside class="sidebar" aria-label="Navegação principal">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">AI</div>
+          <div>
+            <strong>APPIGREJA</strong>
+            <span>Cuidado e Zaqueus</span>
+          </div>
+        </div>
+
+        <nav class="nav-list">
+          <label class="nav-item dashboard-only" data-screen="dashboard" for="tab-dashboard">
+            <span class="icon" aria-hidden="true">D</span>
+            Dashboard
+          </label>
+          <label class="nav-item" data-screen="visitas" for="tab-visitas">
+            <span class="icon" aria-hidden="true">V</span>
+            Visitas realizadas
+          </label>
+          <label class="nav-item" data-screen="nova-visita" for="tab-nova-visita">
+            <span class="icon" aria-hidden="true">+</span>
+            Nova visita
+          </label>
+          <label class="nav-item" data-screen="zaqueus" for="tab-zaqueus">
+            <span class="icon" aria-hidden="true">Z</span>
+            Zaqueus
+          </label>
+          <label class="nav-item" data-screen="calendario" for="tab-calendario">
+            <span class="icon" aria-hidden="true">C</span>
+            Calendário Igreja
+          </label>
+          <label class="nav-item" data-screen="biblioteca" for="tab-biblioteca">
+            <span class="icon" aria-hidden="true">B</span>
+            Biblioteca
+          </label>
+          <label class="nav-item" data-screen="visao" for="tab-visao">
+            <span class="icon" aria-hidden="true">G</span>
+            Visão Geral
+          </label>
+          <label class="nav-item" data-screen="notificacoes" for="tab-notificacoes">
+            <span class="icon" aria-hidden="true">N</span>
+            Notificações
+          </label>
+        </nav>
+
+        <div class="profile-card">
+          <span class="avatar" id="profile-avatar" aria-hidden="true">--</span>
+          <div>
+            <strong id="profile-name">Usuário</strong>
+            <span id="profile-role">Perfil</span>
+          </div>
+          <button class="profile-logout" type="button" id="logout-button">Sair</button>
+        </div>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Protótipo operacional</p>
+            <h1 id="screen-title">APPIGREJA</h1>
+          </div>
+          <div class="topbar-actions">
+            <label class="search">
+              <span aria-hidden="true">B</span>
+              <input id="global-search" type="search" placeholder="Buscar visitante ou visitado" />
+            </label>
+            <label class="ghost-button" data-screen="nova-visita" for="tab-nova-visita">Nova visita</label>
+          </div>
+        </header>
+
+        <section class="screen active dashboard-only" id="dashboard" aria-labelledby="dashboard-title">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Resumo do mês</p>
+              <h2 id="dashboard-title">Dashboard</h2>
+            </div>
+            <div class="filter-row">
+              <button class="chip active" type="button">Maio/2026</button>
+              <button class="chip" type="button">Todas igrejas</button>
+            </div>
+          </div>
+
+          <div class="metric-grid compact">
+            <article class="metric-card">
+              <span>Visitas no mês</span>
+              <strong id="metric-month-visits">0</strong>
+              <small>Registros feitos por obreiros logados</small>
+            </article>
+            <article class="metric-card">
+              <span>Minhas visitas</span>
+              <strong id="metric-my-visits">0</strong>
+              <small id="metric-my-visits-label">Usuário logado</small>
+            </article>
+            <article class="metric-card">
+              <span>Igrejas com visitas</span>
+              <strong id="metric-active-churches">0</strong>
+              <small>Separação por ID interno</small>
+            </article>
+            <article class="metric-card">
+              <span>Visitas antes do Zaqueu</span>
+              <strong id="metric-zaqueu-visits">0</strong>
+              <small>Soma semanal dos núcleos ativos</small>
+            </article>
+          </div>
+
+          <section class="panel wide dashboard-chart-panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Comparativo</p>
+                <h3>Visitas por igreja e mês</h3>
+              </div>
+              <div class="chart-legend" aria-label="Legenda do gráfico">
+                <span><b class="legend-dot sede"></b>Igreja Sede</span>
+                <span><b class="legend-dot norte"></b>Igreja Norte</span>
+                <span><b class="legend-dot leste"></b>Igreja Leste</span>
+              </div>
+            </div>
+            <div class="comparison-chart-wrap">
+              <div class="comparison-chart" id="church-month-chart" aria-label="Comparativo mensal de visitas por igreja">
+                <div class="month-group">
+                  <div class="bar-set">
+                    <span class="bar sede" style="height: 0%"><b>0</b></span>
+                    <span class="bar norte" style="height: 0%"><b>0</b></span>
+                    <span class="bar leste" style="height: 0%"><b>0</b></span>
+                  </div>
+                  <strong>Jan</strong>
+                </div>
+                <div class="month-group">
+                  <div class="bar-set">
+                    <span class="bar sede" style="height: 0%"><b>0</b></span>
+                    <span class="bar norte" style="height: 0%"><b>0</b></span>
+                    <span class="bar leste" style="height: 0%"><b>0</b></span>
+                  </div>
+                  <strong>Fev</strong>
+                </div>
+                <div class="month-group">
+                  <div class="bar-set">
+                    <span class="bar sede" style="height: 0%"><b>0</b></span>
+                    <span class="bar norte" style="height: 0%"><b>0</b></span>
+                    <span class="bar leste" style="height: 0%"><b>0</b></span>
+                  </div>
+                  <strong>Mar</strong>
+                </div>
+                <div class="month-group">
+                  <div class="bar-set">
+                    <span class="bar sede" style="height: 0%"><b>0</b></span>
+                    <span class="bar norte" style="height: 0%"><b>0</b></span>
+                    <span class="bar leste" style="height: 0%"><b>0</b></span>
+                  </div>
+                  <strong>Abr</strong>
+                </div>
+                <div class="month-group">
+                  <div class="bar-set">
+                    <span class="bar sede" style="height: 0%"><b>0</b></span>
+                    <span class="bar norte" style="height: 0%"><b>0</b></span>
+                    <span class="bar leste" style="height: 0%"><b>0</b></span>
+                  </div>
+                  <strong>Mai</strong>
+                </div>
+                <div class="month-group">
+                  <div class="bar-set">
+                    <span class="bar sede" style="height: 0%"><b>0</b></span>
+                    <span class="bar norte" style="height: 0%"><b>0</b></span>
+                    <span class="bar leste" style="height: 0%"><b>0</b></span>
+                  </div>
+                  <strong>Jun</strong>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel wide">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Lista de visitas</p>
+                <h3>Registros mais recentes</h3>
+              </div>
+              <label class="text-button" data-screen="nova-visita" for="tab-nova-visita">Registrar visita</label>
+            </div>
+            <div class="visit-list" id="dashboard-visits"></div>
+          </section>
+        </section>
+
+        <section class="screen" id="visitas" aria-labelledby="visitas-title">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Histórico de campo</p>
+              <h2 id="visitas-title">Visitas realizadas</h2>
+            </div>
+            <label class="primary-button" data-screen="nova-visita" for="tab-nova-visita">Nova visita</label>
+          </div>
+
+          <div class="toolbar">
+            <label class="search inline">
+              <span aria-hidden="true">B</span>
+              <input id="visit-search" type="search" placeholder="Nome do visitante ou visitado" />
+            </label>
+            <select id="church-filter" aria-label="Filtrar por igreja">
+              <option value="todos">Todas as igrejas</option>
+              <option value="sede">Igreja Sede</option>
+              <option value="norte">Igreja Norte</option>
+              <option value="leste">Igreja Leste</option>
+            </select>
+            <select id="worker-filter" aria-label="Filtrar por obreiro">
+              <option value="todos">Todos os obreiros</option>
+            </select>
+            <select id="pastor-filter" aria-label="Filtrar por pastor">
+              <option value="todos">Todos os pastores</option>
+              <option value="pr-julio">Pr. Júlio</option>
+              <option value="pr-marcos">Pr. Marcos</option>
+              <option value="pra-elisa">Pra. Elisa</option>
+            </select>
+          </div>
+
+          <div class="visit-list" id="visit-results"></div>
+        </section>
+
+        <section class="screen" id="nova-visita" aria-labelledby="nova-visita-title">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Registro rápido</p>
+              <h2 id="nova-visita-title">Nova visita</h2>
+            </div>
+            <span class="saving-state" id="saving-state">Data selecionável</span>
+          </div>
+
+          <form class="visit-form" id="visit-form">
+            <input id="visit-worker-id" type="hidden" name="workerId" />
+            <input id="visit-church-id" type="hidden" name="churchId" />
+            <input id="visit-role-id" type="hidden" name="roleId" />
+
+            <div class="form-grid">
+              <label>
+                Data da visita
+                <input id="visit-date" name="date" type="date" />
+              </label>
+              <label>
+                Visitante logado
+                <input id="visit-worker-name" name="worker" type="text" readonly />
+              </label>
+              <label>
+                Igreja vinculada
+                <input id="visit-church-name" name="church" type="text" readonly />
+              </label>
+              <label>
+                Pessoa/família visitada
+                <input name="visited" type="text" placeholder="Nome da pessoa ou família visitada" required />
+              </label>
+            </div>
+
+            <label>
+              Resumo da visita
+              <textarea name="summary" rows="7" placeholder="Escreva o essencial: quem foi visitado, como foi recebido, o que ficou combinado e qualquer observação pastoral importante." required></textarea>
+            </label>
+
+            <div class="form-actions">
+              <button class="secondary-button" type="reset">Limpar</button>
+              <button class="primary-button" type="submit">Salvar visita</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="screen" id="zaqueus" aria-labelledby="zaqueus-title">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Núcleos abertos</p>
+              <h2 id="zaqueus-title">Zaqueus</h2>
+            </div>
+            <a class="primary-button" href="#novo-zaqueu">Criar Novo Zaqueu</a>
+          </div>
+
+          <div class="zaqueu-layout">
+            <section class="panel wide">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">Controle semanal</p>
+                  <h3>Zaqueus em andamento</h3>
+                </div>
+              </div>
+              <div class="zaqueu-list" id="zaqueu-list"></div>
+            </section>
+
+            <section class="panel" id="novo-zaqueu">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">Abertura</p>
+                  <h3>Novo Zaqueu</h3>
+                </div>
+              </div>
+              <form class="stack-form" id="zaqueu-form">
+                <label>
+                  Endereço completo
+                  <textarea name="address" rows="3" placeholder="Rua, número, bairro, cidade" required></textarea>
+                </label>
+                <div class="form-grid one">
+                  <label>
+                    Data de início
+                    <input id="zaqueu-start" name="start" type="date" required />
+                  </label>
+                  <label>
+                    Data de término
+                    <input id="zaqueu-end" name="end" type="date" readonly />
+                  </label>
+                </div>
+                <label>
+                  Anfitriões
+                  <input name="hosts" type="text" placeholder="Nomes dos anfitriões" required />
+                </label>
+                <label>
+                  Responsáveis
+                  <input name="leaders" type="text" placeholder="Obreiros ou liderança responsável" required />
+                </label>
+                <label>
+                  Pessoas iniciando sem responsáveis/anfitriões
+                  <input name="initialPeople" type="number" min="0" value="0" />
+                </label>
+                <div class="form-grid one">
+                  <label>
+                    Dia da semana
+                    <select name="weekday">
+                      <option>Domingo</option>
+                      <option>Segunda-feira</option>
+                      <option>Terça-feira</option>
+                      <option>Quarta-feira</option>
+                      <option>Quinta-feira</option>
+                      <option>Sexta-feira</option>
+                      <option>Sábado</option>
+                    </select>
+                  </label>
+                  <label>
+                    Horário
+                    <input name="time" type="time" value="19:30" />
+                  </label>
+                </div>
+                <button class="primary-button" type="submit">Criar Novo Zaqueu</button>
+              </form>
+            </section>
+          </div>
+
+          <section class="panel wide material-panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Material do Zaqueu</p>
+                <h3>Fotos e PDFs</h3>
+              </div>
+              <select id="zaqueu-material-filter" aria-label="Filtrar material do Zaqueu">
+                <option value="todos">Todos</option>
+                <option value="pdf">PDFs</option>
+                <option value="foto">Fotos</option>
+              </select>
+            </div>
+            <label class="upload-box">
+              <span>Subir arquivos do Zaqueu</span>
+              <input id="zaqueu-files" type="file" multiple accept=".pdf,image/*" />
+            </label>
+            <div class="content-card-grid" id="zaqueu-materials"></div>
+          </section>
+        </section>
+
+        <section class="screen" id="calendario" aria-labelledby="calendario-title">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Agenda mensal</p>
+              <h2 id="calendario-title">Calendário Igreja</h2>
+            </div>
+            <div class="filter-row">
+              <label class="month-filter">
+                Mês
+                <input id="calendar-month" type="month" />
+              </label>
+            </div>
+          </div>
+
+          <div class="calendar-layout">
+            <section class="panel wide">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">Secretaria sede</p>
+                  <h3>Programação do mês</h3>
+                </div>
+                <span class="saving-state">Consulta</span>
+              </div>
+              <div class="calendar-board" id="calendar-board"></div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">Eventos</p>
+                  <h3>Lista do mês</h3>
+                </div>
+              </div>
+              <div class="calendar-event-list" id="calendar-event-list"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="screen" id="biblioteca" aria-labelledby="biblioteca-title">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Conteúdos para baixar</p>
+              <h2 id="biblioteca-title">Biblioteca</h2>
+            </div>
+            <button class="primary-button admin-only" type="button" id="focus-library-form">Adicionar conteúdo ADM</button>
+          </div>
+
+          <section class="panel wide library-panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Disponíveis</p>
+                <h3>Devocionais e direcionamentos</h3>
+              </div>
+              <div class="segmented" role="group" aria-label="Categorias da biblioteca">
+                <button class="active" type="button" data-library-category="todos">Todos</button>
+                <button type="button" data-library-category="devocional">Devocionais</button>
+                <button type="button" data-library-category="direcionamento">Direcionamentos</button>
+                <button type="button" data-library-category="link">Links</button>
+              </div>
+            </div>
+            <div class="content-card-grid" id="library-grid"></div>
+          </section>
+        </section>
+
+        <section class="screen" id="visao" aria-labelledby="visao-title">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Liderança</p>
+              <h2 id="visao-title">Visão Geral</h2>
+            </div>
+            <div class="filter-row">
+              <button class="chip active" type="button">Semana atual</button>
+              <button class="chip" type="button">Todas igrejas</button>
+            </div>
+          </div>
+
+          <div class="metric-grid compact">
+            <article class="metric-card">
+              <span>Visitas realizadas</span>
+              <strong id="overview-visits">0</strong>
+              <small>Registros do mês</small>
+            </article>
+            <article class="metric-card">
+              <span>Visitas antes dos cultos</span>
+              <strong id="overview-zaqueu-visits">0</strong>
+              <small>Somente semana atual</small>
+            </article>
+            <article class="metric-card">
+              <span>Visitantes nos cultos</span>
+              <strong id="overview-cult-visitors">0</strong>
+              <small>Somados por semana</small>
+            </article>
+            <article class="metric-card">
+              <span>Frequentando semanalmente</span>
+              <strong id="overview-weekly-people">0</strong>
+              <small>Pessoas recorrentes nos Zaqueus</small>
+            </article>
+          </div>
+
+          <div class="leader-grid">
+            <section class="panel wide">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">Zaqueu</p>
+                  <h3>Frequência por semana</h3>
+                </div>
+              </div>
+              <div class="chart" aria-label="Gráfico semanal de Zaqueus">
+                <span style="height: 0%"><b>0</b></span>
+                <span style="height: 0%"><b>0</b></span>
+                <span style="height: 0%"><b>0</b></span>
+                <span style="height: 0%"><b>0</b></span>
+                <span style="height: 0%"><b>0</b></span>
+              </div>
+              <div class="chart-labels">
+                <span>Sem 1</span>
+                <span>Sem 2</span>
+                <span>Sem 3</span>
+                <span>Sem 4</span>
+                <span>Sem 5</span>
+              </div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">Separação por ID</p>
+                  <h3>Igrejas e cargos</h3>
+                </div>
+              </div>
+              <div class="rank-list" id="overview-rank"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="screen" id="notificacoes" aria-labelledby="notificacoes-title">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">ADM</p>
+              <h2 id="notificacoes-title">Notificações</h2>
+            </div>
+            <button class="primary-button admin-only" type="button" id="focus-notification-form">Nova notificação</button>
+          </div>
+
+          <section class="panel wide">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Últimas</p>
+                <h3>Notificações geradas</h3>
+              </div>
+            </div>
+            <div class="notification-list" id="notification-list"></div>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <input class="adm-toggle" type="checkbox" id="adm-drawer-toggle" />
+    <div class="adm-chat admin-only" aria-label="Painel rápido ADM">
+      <label class="adm-fab" for="adm-drawer-toggle">ADM</label>
+      <section class="adm-panel">
+        <input class="adm-mode" type="radio" name="adm-mode" id="adm-mode-content" checked />
+        <input class="adm-mode" type="radio" name="adm-mode" id="adm-mode-notify" />
+        <header class="adm-header">
+          <div>
+            <p class="eyebrow">Acesso ADM</p>
+            <h3>Adicionar rápido</h3>
+          </div>
+          <label class="adm-minimize" for="adm-drawer-toggle">Minimizar</label>
+        </header>
+        <div class="adm-tabs">
+          <label for="adm-mode-content">Conteúdo</label>
+          <label for="adm-mode-notify">Notificação</label>
+        </div>
+        <form class="stack-form adm-content-form" id="library-form">
+          <label>
+            Tipo
+            <select name="category">
+              <option value="devocional">Devocional</option>
+              <option value="direcionamento">Direcionamento</option>
+              <option value="link">Link de referência</option>
+            </select>
+          </label>
+          <label>
+            Título
+            <input name="title" type="text" placeholder="Nome do material" required />
+          </label>
+          <label>
+            Descrição
+            <textarea name="description" rows="3" placeholder="Resumo do conteúdo"></textarea>
+          </label>
+          <label>
+            Arquivo PDF ou foto
+            <input name="file" type="file" accept=".pdf,image/*" />
+          </label>
+          <label>
+            Link de referência
+            <input name="link" type="url" placeholder="https://..." />
+          </label>
+          <button class="primary-button" type="submit">Adicionar na biblioteca</button>
+        </form>
+        <form class="stack-form adm-notify-form" id="notification-form">
+          <label>
+            Destinatários
+            <select name="audience">
+              <option value="todos">Todos os usuários</option>
+              <option value="obreiro">Somente obreiros</option>
+              <option value="lideranca">Somente liderança</option>
+              <option value="adm">Somente ADMs</option>
+            </select>
+          </label>
+          <label>
+            Título
+            <input name="title" type="text" placeholder="Assunto da notificação" required />
+          </label>
+          <label>
+            Mensagem
+            <textarea name="message" rows="5" placeholder="Escreva o aviso que aparecerá para os usuários." required></textarea>
+          </label>
+          <button class="primary-button" type="submit">Gerar notificação</button>
+        </form>
+      </section>
+    </div>
+
+    <script>
+const STORAGE_KEY = "appigreja_prototype_state_v1";
+const SESSION_KEY = "appigreja_prototype_session_v1";
+
+const CHURCHES = {
+  sede: { name: "Igreja Sede", pastor: "Pr. Júlio", pastorId: "pr-julio" },
+  norte: { name: "Igreja Norte", pastor: "Pr. Marcos", pastorId: "pr-marcos" },
+  leste: { name: "Igreja Leste", pastor: "Pra. Elisa", pastorId: "pra-elisa" },
+};
+
+const ROLE_LABELS = {
+  obreiro: "Obreiro",
+  lideranca: "Liderança",
+  bispo: "Bispo",
+  pastor: "Pastor",
+  adm: "ADM",
+};
+
+const MONTHS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun"];
+
+let appState = loadAppState();
+let currentUser = null;
+
+function emptyState() {
+  return {
+    users: [],
+    visits: [],
+    zaqueus: [],
+    zaqueuMaterials: [],
+    libraryItems: [],
+    calendarEvents: [],
+    notifications: [],
+  };
+}
+
+function loadAppState() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+    return { ...emptyState(), ...parsed };
+  } catch {
+    return emptyState();
+  }
+}
+
+function saveAppState() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+}
+
+function normalizeLogin(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function fallbackHash(value) {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash << 5) - hash + value.charCodeAt(index);
+    hash |= 0;
+  }
+  return `fallback:${hash}`;
+}
+
+async function hashPassword(password) {
+  if (window.crypto?.subtle) {
+    const bytes = new TextEncoder().encode(password);
+    const digest = await window.crypto.subtle.digest("SHA-256", bytes);
+    return Array.from(new Uint8Array(digest))
+      .map((byte) => byte.toString(16).padStart(2, "0"))
+      .join("");
+  }
+  return fallbackHash(password);
+}
+
+function formatDateLocal(date = new Date()) {
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 10);
+}
+
+function formatMonthLocal(date = new Date()) {
+  return formatDateLocal(date).slice(0, 7);
+}
+
+function formatDate(value) {
+  if (!value) return "";
+  const [datePart, timePart] = String(value).split("T");
+  const [year, month, day] = datePart.split("-");
+  const time = timePart ? ` às ${timePart}` : "";
+  return `${day}/${month}/${year}${time}`;
+}
+
+function addWeeks(dateValue, weeks) {
+  const date = new Date(`${dateValue}T00:00:00`);
+  date.setDate(date.getDate() + weeks * 7);
+  return date.toISOString().slice(0, 10);
+}
+
+function setAuthMessage(message, tone = "info") {
+  const target = document.querySelector("#auth-message");
+  if (!target) return;
+  target.textContent = message;
+  target.dataset.tone = tone;
+}
+
+function showAuthMode(mode) {
+  const isRegister = mode === "register";
+  document.querySelector("#login-form")?.classList.toggle("active", !isRegister);
+  document.querySelector("#register-form")?.classList.toggle("active", isRegister);
+  document.querySelector("#show-login")?.classList.toggle("active", !isRegister);
+  document.querySelector("#show-register")?.classList.toggle("active", isRegister);
+  setAuthMessage("");
+}
+
+function getInitials(name) {
+  return String(name || "U")
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
+}
+
+function isAdmin() {
+  return currentUser?.roleId === "adm";
+}
+
+function canViewDashboard() {
+  return currentUser?.roleId === "bispo" || currentUser?.roleId === "pastor";
+}
+
+function canViewAllVisits() {
+  return currentUser?.roleId === "bispo" || currentUser?.roleId === "pastor";
+}
+
+function getVisibleVisits() {
+  if (canViewAllVisits()) return appState.visits;
+  return appState.visits.filter((visit) => visit.visitorId === currentUser?.id);
+}
+
+function authenticateAs(user) {
+  currentUser = user;
+  localStorage.setItem(SESSION_KEY, user.id);
+  document.body.classList.add("is-authenticated");
+  document.body.classList.toggle("is-admin", isAdmin());
+  document.body.classList.toggle("can-dashboard", canViewDashboard());
+  renderAll();
+  setScreen(canViewDashboard() ? "dashboard" : "visitas");
+}
+
+function logout() {
+  currentUser = null;
+  localStorage.removeItem(SESSION_KEY);
+  document.body.classList.remove("is-authenticated", "is-admin", "can-dashboard");
+  const drawer = document.querySelector("#adm-drawer-toggle");
+  if (drawer) drawer.checked = false;
+  showAuthMode("login");
+  setAuthMessage("Sessão encerrada neste aparelho.", "info");
+}
+
+function renderProfile() {
+  if (!currentUser) return;
+  const profileName = document.querySelector("#profile-name");
+  const profileRole = document.querySelector("#profile-role");
+  const profileAvatar = document.querySelector("#profile-avatar");
+  if (profileName) profileName.textContent = currentUser.name;
+  if (profileRole) profileRole.textContent = `${ROLE_LABELS[currentUser.roleId] || currentUser.role} - ${currentUser.church}`;
+  if (profileAvatar) profileAvatar.textContent = getInitials(currentUser.name);
+}
+
+function renderVisitUserFields() {
+  if (!currentUser) return;
+  const fields = {
+    "#visit-worker-id": currentUser.id,
+    "#visit-church-id": currentUser.churchId,
+    "#visit-role-id": currentUser.roleId,
+    "#visit-worker-name": currentUser.name,
+    "#visit-church-name": currentUser.church,
+  };
+  Object.entries(fields).forEach(([selector, value]) => {
+    const input = document.querySelector(selector);
+    if (input) input.value = value || "";
+  });
+}
+
+function renderWorkerFilter() {
+  const select = document.querySelector("#worker-filter");
+  if (!select) return;
+  const users = canViewAllVisits()
+    ? [...appState.users].sort((a, b) => a.name.localeCompare(b.name))
+    : currentUser
+      ? [currentUser]
+      : [];
+  select.innerHTML = [
+    `<option value="todos">${canViewAllVisits() ? "Todos os obreiros" : "Minhas visitas"}</option>`,
+    ...users.map((user) => `<option value="${escapeHtml(user.id)}">${escapeHtml(user.name)}</option>`),
+  ].join("");
+}
+
+function setAutomaticVisitDate() {
+  const input = document.querySelector("#visit-date");
+  if (input && !input.value) input.value = formatDateLocal();
+}
+
+function setScreen(screenId) {
+  if (screenId === "dashboard" && !canViewDashboard()) {
+    screenId = "visitas";
+  }
+  const toggle = document.querySelector(`#tab-${screenId}`);
+  if (toggle) toggle.checked = true;
+  const title = document.querySelector(`#${screenId} h2`)?.textContent.trim() || "APPIGREJA";
+  const screenTitle = document.querySelector("#screen-title");
+  if (screenTitle) screenTitle.textContent = title;
+}
+
+function emptyCard(message) {
+  return `<article class="notification-item empty-card"><p>${escapeHtml(message)}</p></article>`;
+}
+
+function visitCard(visit) {
+  return `
+    <article class="visit-item" data-church="${escapeHtml(visit.churchId)}" data-worker="${escapeHtml(visit.visitorId)}" data-pastor="${escapeHtml(visit.pastorId)}">
+      <div>
+        <div class="tag-row">
+          <span class="tag">${escapeHtml(visit.church)}</span>
+          <span class="tag">${escapeHtml(visit.pastor)}</span>
+        </div>
+        <h3>${escapeHtml(visit.visited)}</h3>
+        <p>${escapeHtml(visit.summary)}</p>
+        <div class="meta-row">
+          <span>${escapeHtml(formatDate(visit.date))}</span>
+          <span>Visitante: ${escapeHtml(visit.visitor)}</span>
+        </div>
+      </div>
+      <div class="tag-row">
+        <span class="status-pill">Salvo localmente</span>
+      </div>
+    </article>
+  `;
+}
+
+function renderVisits() {
+  const search = (document.querySelector("#visit-search")?.value || document.querySelector("#global-search")?.value || "").toLowerCase();
+  const church = document.querySelector("#church-filter")?.value || "todos";
+  const worker = document.querySelector("#worker-filter")?.value || "todos";
+  const pastor = document.querySelector("#pastor-filter")?.value || "todos";
+
+  const visibleVisits = getVisibleVisits();
+  const filtered = visibleVisits.filter((visit) => {
+    const names = `${visit.visited} ${visit.visitor}`.toLowerCase();
+    const matchesSearch = !search || names.includes(search);
+    const matchesChurch = church === "todos" || visit.churchId === church;
+    const matchesWorker = worker === "todos" || visit.visitorId === worker;
+    const matchesPastor = pastor === "todos" || visit.pastorId === pastor;
+    return matchesSearch && matchesChurch && matchesWorker && matchesPastor;
+  });
+
+  const visitsHtml = filtered.map(visitCard).join("");
+  const results = document.querySelector("#visit-results");
+  if (results) {
+    const message = canViewAllVisits()
+      ? "Nenhuma visita registrada ainda."
+      : "Nenhuma visita registrada por você ainda.";
+    results.innerHTML = visitsHtml || emptyCard(message);
+  }
+
+  const dashboard = document.querySelector("#dashboard-visits");
+  if (dashboard) {
+    dashboard.innerHTML = visibleVisits.length
+      ? visibleVisits.slice(0, 5).map(visitCard).join("")
+      : emptyCard("O Dashboard começará a mostrar visitas assim que alguém registrar a primeira.");
+  }
+
+  renderVisitMetrics();
+}
+
+function renderVisitMetrics() {
+  const currentMonth = formatDateLocal().slice(0, 7);
+  const visibleVisits = getVisibleVisits();
+  const monthVisits = visibleVisits.filter((visit) => String(visit.date).slice(0, 7) === currentMonth);
+  const myVisits = monthVisits.filter((visit) => visit.visitorId === currentUser?.id);
+  const activeChurches = new Set(monthVisits.map((visit) => visit.churchId)).size;
+
+  const metricMonthVisits = document.querySelector("#metric-month-visits");
+  const metricMyVisits = document.querySelector("#metric-my-visits");
+  const metricMyVisitsLabel = document.querySelector("#metric-my-visits-label");
+  const metricActiveChurches = document.querySelector("#metric-active-churches");
+  const overviewVisits = document.querySelector("#overview-visits");
+
+  if (metricMonthVisits) metricMonthVisits.textContent = String(monthVisits.length);
+  if (metricMyVisits) metricMyVisits.textContent = String(myVisits.length);
+  if (metricMyVisitsLabel) metricMyVisitsLabel.textContent = currentUser?.name || "Usuário logado";
+  if (metricActiveChurches) metricActiveChurches.textContent = String(activeChurches);
+  if (overviewVisits) overviewVisits.textContent = String(monthVisits.length);
+}
+
+function renderChurchMonthChart() {
+  const container = document.querySelector("#church-month-chart");
+  if (!container) return;
+
+  const grouped = MONTHS.map((month, index) => {
+    const monthNumber = String(index + 1).padStart(2, "0");
+    const visits = getVisibleVisits().filter((visit) => String(visit.date).slice(5, 7) === monthNumber);
+    return {
+      month,
+      sede: visits.filter((visit) => visit.churchId === "sede").length,
+      norte: visits.filter((visit) => visit.churchId === "norte").length,
+      leste: visits.filter((visit) => visit.churchId === "leste").length,
+    };
+  });
+
+  const maxValue = Math.max(1, ...grouped.flatMap((item) => [item.sede, item.norte, item.leste]));
+
+  container.innerHTML = grouped
+    .map((item) => {
+      const height = (value) => (value === 0 ? "0%" : `${Math.max(12, Math.round((value / maxValue) * 92))}%`);
+      const zero = (value) => (value === 0 ? " zero" : "");
+      return `
+        <div class="month-group">
+          <div class="bar-set">
+            <span class="bar sede${zero(item.sede)}" style="height: ${height(item.sede)}"><b>${item.sede}</b></span>
+            <span class="bar norte${zero(item.norte)}" style="height: ${height(item.norte)}"><b>${item.norte}</b></span>
+            <span class="bar leste${zero(item.leste)}" style="height: ${height(item.leste)}"><b>${item.leste}</b></span>
+          </div>
+          <strong>${item.month}</strong>
+        </div>
+      `;
+    })
+    .join("");
+}
+
+function renderZaqueus() {
+  const container = document.querySelector("#zaqueu-list");
+  if (!container) return;
+
+  if (!appState.zaqueus.length) {
+    container.innerHTML = emptyCard("Nenhum Zaqueu aberto ainda. Use Criar Novo Zaqueu para começar.");
+    renderOverview();
+    return;
+  }
+
+  container.innerHTML = appState.zaqueus
+    .map(
+      (zaqueu) => `
+        <article class="zaqueu-card">
+          <div class="tag-row">
+            <span class="tag">Zaqueu</span>
+            <span class="status-pill">Semana ${escapeHtml(zaqueu.week)} de 5</span>
+          </div>
+          <h3>${escapeHtml(zaqueu.address)}</h3>
+          <p>Início: ${escapeHtml(formatDate(zaqueu.start))} | Término automático: ${escapeHtml(formatDate(zaqueu.end))}</p>
+          <p>${escapeHtml(zaqueu.weekday)} às ${escapeHtml(zaqueu.time)} | Anfitriões: ${escapeHtml(zaqueu.hosts)}</p>
+          <div class="week-boxes">
+            <label class="week-box">
+              <span>Visitas antes do culto</span>
+              <input class="zaqueu-input" data-id="${escapeHtml(zaqueu.id)}" data-field="weekVisits" type="number" min="0" value="${escapeHtml(zaqueu.weekVisits)}" />
+            </label>
+            <label class="week-box">
+              <span>Visitantes por culto</span>
+              <input class="zaqueu-input" data-id="${escapeHtml(zaqueu.id)}" data-field="weekVisitors" type="number" min="0" value="${escapeHtml(zaqueu.weekVisitors)}" />
+            </label>
+            <label class="week-box">
+              <span>Frequentando semanalmente</span>
+              <input class="zaqueu-input" data-id="${escapeHtml(zaqueu.id)}" data-field="weeklyPeople" type="number" min="0" value="${escapeHtml(zaqueu.weeklyPeople)}" />
+            </label>
+          </div>
+          <div class="zaqueu-actions">
+            <button class="secondary-button update-week" type="button" data-id="${escapeHtml(zaqueu.id)}">Atualizar semana</button>
+          </div>
+        </article>
+      `,
+    )
+    .join("");
+
+  document.querySelectorAll(".zaqueu-input").forEach((input) => {
+    input.addEventListener("input", () => {
+      const item = appState.zaqueus.find((zaqueu) => zaqueu.id === input.dataset.id);
+      if (item) item[input.dataset.field] = Number(input.value || 0);
+      saveAppState();
+      renderOverview();
+    });
+  });
+
+  document.querySelectorAll(".update-week").forEach((button) => {
+    button.addEventListener("click", () => {
+      const item = appState.zaqueus.find((zaqueu) => zaqueu.id === button.dataset.id);
+      if (!item) return;
+      item.week = Math.min(5, Number(item.week || 1) + 1);
+      item.weekVisits = 0;
+      item.weekVisitors = 0;
+      item.weeklyPeople = 0;
+      saveAppState();
+      renderZaqueus();
+      renderOverview();
+    });
+  });
+}
+
+function renderOverview() {
+  const visitTotal = appState.zaqueus.reduce((sum, item) => sum + Number(item.weekVisits || 0), 0);
+  const visitorTotal = appState.zaqueus.reduce((sum, item) => sum + Number(item.weekVisitors || 0), 0);
+  const weeklyPeople = appState.zaqueus.reduce((sum, item) => sum + Number(item.weeklyPeople || 0), 0);
+
+  const updates = {
+    "#metric-zaqueu-visits": visitTotal,
+    "#overview-zaqueu-visits": visitTotal,
+    "#overview-cult-visitors": visitorTotal,
+    "#overview-weekly-people": weeklyPeople,
+  };
+
+  Object.entries(updates).forEach(([selector, value]) => {
+    const el = document.querySelector(selector);
+    if (el) el.textContent = String(value);
+  });
+
+  renderOverviewRank();
+}
+
+function renderOverviewRank() {
+  const container = document.querySelector("#overview-rank");
+  if (!container) return;
+  const visibleVisits = getVisibleVisits();
+  if (!visibleVisits.length) {
+    container.innerHTML = emptyCard("Sem registros para separar por igreja e cargo ainda.");
+    return;
+  }
+
+  const byChurch = Object.values(CHURCHES).map((church) => {
+    const count = visibleVisits.filter((visit) => visit.church === church.name).length;
+    return `<div><strong>${escapeHtml(church.name)}</strong><span>${count} visitas</span></div>`;
+  });
+  const pastors = visibleVisits.filter((visit) => appState.users.find((user) => user.id === visit.visitorId)?.roleId === "pastor").length;
+  const workers = visibleVisits.filter((visit) => appState.users.find((user) => user.id === visit.visitorId)?.roleId === "obreiro").length;
+  container.innerHTML = [...byChurch, `<div><strong>Pastores</strong><span>${pastors} registros</span></div>`, `<div><strong>Obreiros</strong><span>${workers} registros</span></div>`].join("");
+}
+
+function renderMaterials(filter = "todos") {
+  const container = document.querySelector("#zaqueu-materials");
+  if (!container) return;
+  const items = appState.zaqueuMaterials.filter((item) => filter === "todos" || item.type === filter);
+  if (!items.length) {
+    container.innerHTML = emptyCard("Nenhum material do Zaqueu adicionado ainda.");
+    return;
+  }
+  container.innerHTML = items
+    .map(
+      (item) => `
+        <article class="content-card" data-type="${escapeHtml(item.type)}">
+          <div class="content-art" aria-hidden="true">${item.type === "pdf" ? "PDF" : "FOTO"}</div>
+          <div>
+            <span class="tag">${item.type === "pdf" ? "PDF" : "Foto"}</span>
+            <h3>${escapeHtml(item.title)}</h3>
+          </div>
+          <p>${escapeHtml(item.description)}</p>
+          <div class="content-actions">
+            <button class="secondary-button" type="button">Arquivo local</button>
+          </div>
+        </article>
+      `,
+    )
+    .join("");
+}
+
+function renderLibrary(category = "todos") {
+  const container = document.querySelector("#library-grid");
+  if (!container) return;
+  const items = appState.libraryItems.filter((item) => category === "todos" || item.category === category);
+  if (!items.length) {
+    container.innerHTML = emptyCard("A biblioteca ainda está vazia. Um ADM pode adicionar devocionais, direcionamentos, fotos, PDFs ou links.");
+    return;
+  }
+  container.innerHTML = items
+    .map(
+      (item) => `
+        <article class="content-card">
+          <div class="content-art" aria-hidden="true">${escapeHtml(item.kind)}</div>
+          <div>
+            <span class="tag">${escapeHtml(item.category)}</span>
+            <h3>${escapeHtml(item.title)}</h3>
+          </div>
+          <p>${escapeHtml(item.description || "Conteúdo liberado pela administração.")}</p>
+          ${item.link ? `<small>Referência: ${escapeHtml(item.link)}</small>` : "<small>Referência local do protótipo</small>"}
+          <div class="content-actions">
+            <button class="secondary-button" type="button">Ver referência</button>
+          </div>
+        </article>
+      `,
+    )
+    .join("");
+}
+
+function renderNotifications() {
+  const container = document.querySelector("#notification-list");
+  if (!container) return;
+  if (!appState.notifications.length) {
+    container.innerHTML = emptyCard("Nenhuma notificação gerada ainda.");
+    return;
+  }
+  container.innerHTML = appState.notifications
+    .map(
+      (notification) => `
+        <article class="notification-item">
+          <div class="tag-row">
+            <span class="tag">${escapeHtml(notification.audience)}</span>
+            <span class="status-pill">${escapeHtml(notification.date)}</span>
+          </div>
+          <h3>${escapeHtml(notification.title)}</h3>
+          <p>${escapeHtml(notification.message)}</p>
+        </article>
+      `,
+    )
+    .join("");
+}
+
+function renderCalendar() {
+  const monthInput = document.querySelector("#calendar-month");
+  const board = document.querySelector("#calendar-board");
+  const list = document.querySelector("#calendar-event-list");
+  if (!monthInput || !board || !list) return;
+
+  if (!monthInput.value) monthInput.value = formatMonthLocal();
+
+  const [year, month] = monthInput.value.split("-").map(Number);
+  const firstDay = new Date(year, month - 1, 1);
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const firstWeekday = firstDay.getDay();
+  const events = appState.calendarEvents
+    .filter((event) => String(event.date || "").slice(0, 7) === monthInput.value)
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+
+  const weekdays = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+  const cells = weekdays.map((day) => `<div class="calendar-weekday">${day}</div>`);
+
+  for (let index = 0; index < firstWeekday; index += 1) {
+    cells.push(`<div class="calendar-day empty" aria-hidden="true"></div>`);
+  }
+
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    const date = `${monthInput.value}-${String(day).padStart(2, "0")}`;
+    const dayEvents = events.filter((event) => event.date === date);
+    cells.push(`
+      <div class="calendar-day">
+        <strong>${day}</strong>
+        ${dayEvents
+          .map((event) => `<span class="calendar-dot">${escapeHtml(event.title || "Evento")}</span>`)
+          .join("")}
+      </div>
+    `);
+  }
+
+  board.innerHTML = cells.join("");
+  list.innerHTML = events.length
+    ? events
+        .map(
+          (event) => `
+            <article class="calendar-event">
+              <div class="tag-row">
+                <span class="tag">${escapeHtml(formatDate(event.date))}</span>
+                <span class="tag">${escapeHtml(event.church || "Igreja Sede")}</span>
+              </div>
+              <strong>${escapeHtml(event.title || "Evento")}</strong>
+              <p>${escapeHtml(event.description || event.type || "Programação da igreja.")}</p>
+              ${event.time ? `<small>Horário: ${escapeHtml(event.time)}</small>` : ""}
+            </article>
+          `,
+        )
+        .join("")
+    : emptyCard("Nenhum evento cadastrado para este mês. A secretaria da sede atualizará a programação pelo banco de dados.");
+}
+
+function updateZaqueuEndDate() {
+  const startInput = document.querySelector("#zaqueu-start");
+  const endInput = document.querySelector("#zaqueu-end");
+  if (!startInput || !endInput) return;
+  if (!startInput.value) startInput.value = formatDateLocal();
+  endInput.value = addWeeks(startInput.value, 5);
+}
+
+function openAdmDrawer(mode = "content") {
+  if (!isAdmin()) return;
+  const drawer = document.querySelector("#adm-drawer-toggle");
+  const contentMode = document.querySelector("#adm-mode-content");
+  const notifyMode = document.querySelector("#adm-mode-notify");
+  if (drawer) drawer.checked = true;
+  if (mode === "notify" && notifyMode) notifyMode.checked = true;
+  if (mode === "content" && contentMode) contentMode.checked = true;
+}
+
+function renderAll() {
+  renderProfile();
+  renderWorkerFilter();
+  renderVisitUserFields();
+  setAutomaticVisitDate();
+  updateZaqueuEndDate();
+  renderVisits();
+  renderChurchMonthChart();
+  renderZaqueus();
+  renderOverview();
+  renderMaterials(document.querySelector("#zaqueu-material-filter")?.value || "todos");
+  renderLibrary(document.querySelector("[data-library-category].active")?.dataset.libraryCategory || "todos");
+  renderCalendar();
+  renderNotifications();
+}
+
+function wireAuth() {
+  document.querySelector("#show-login")?.addEventListener("click", () => showAuthMode("login"));
+  document.querySelector("#show-register")?.addEventListener("click", () => showAuthMode("register"));
+  document.querySelector("#logout-button")?.addEventListener("click", logout);
+
+  document.querySelector("#register-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const loginKey = normalizeLogin(form.get("login"));
+    if (appState.users.some((user) => user.loginKey === loginKey)) {
+      setAuthMessage("Já existe um cadastro com esse e-mail ou telefone neste aparelho.", "error");
+      return;
+    }
+
+    const church = CHURCHES[form.get("churchId")] || CHURCHES.sede;
+    const user = {
+      id: `user_${Date.now()}`,
+      name: String(form.get("name")).trim(),
+      login: String(form.get("login")).trim(),
+      loginKey,
+      passwordHash: await hashPassword(String(form.get("password"))),
+      roleId: form.get("roleId"),
+      role: ROLE_LABELS[form.get("roleId")] || "Obreiro",
+      churchId: form.get("churchId"),
+      church: church.name,
+      pastor: church.pastor,
+      pastorId: church.pastorId,
+      createdAt: new Date().toISOString(),
+    };
+
+    appState.users.push(user);
+    saveAppState();
+    event.currentTarget.reset();
+    authenticateAs(user);
+  });
+
+  document.querySelector("#login-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const loginKey = normalizeLogin(form.get("login"));
+    const user = appState.users.find((item) => item.loginKey === loginKey);
+    if (!user) {
+      setAuthMessage("Cadastro não encontrado neste aparelho.", "error");
+      return;
+    }
+    const passwordHash = await hashPassword(String(form.get("password")));
+    if (passwordHash !== user.passwordHash) {
+      setAuthMessage("Senha inválida para este cadastro.", "error");
+      return;
+    }
+    event.currentTarget.reset();
+    authenticateAs(user);
+  });
+}
+
+function wireEvents() {
+  document.querySelectorAll("[data-screen]").forEach((button) => {
+    button.addEventListener("click", () => setScreen(button.dataset.screen));
+  });
+
+  ["#visit-search", "#global-search", "#church-filter", "#worker-filter", "#pastor-filter"].forEach((selector) => {
+    document.querySelector(selector)?.addEventListener("input", renderVisits);
+    document.querySelector(selector)?.addEventListener("change", renderVisits);
+  });
+
+  document.querySelector("#visit-form")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    if (!currentUser) return;
+    const form = new FormData(event.currentTarget);
+    appState.visits.unshift({
+      id: `vis_${Date.now()}`,
+      visited: form.get("visited"),
+      visitor: currentUser.name,
+      visitorId: currentUser.id,
+      church: currentUser.church,
+      churchId: currentUser.churchId,
+      pastor: currentUser.pastor,
+      pastorId: currentUser.pastorId,
+      date: form.get("date") || formatDateLocal(),
+      summary: form.get("summary"),
+      createdAt: new Date().toISOString(),
+    });
+    saveAppState();
+    document.querySelector("#saving-state").textContent = "Visita salva neste aparelho";
+    event.currentTarget.reset();
+    setAutomaticVisitDate();
+    renderAll();
+    setScreen("dashboard");
+  });
+
+  document.querySelector("#zaqueu-start")?.addEventListener("input", updateZaqueuEndDate);
+  document.querySelector("#zaqueu-form")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const start = form.get("start");
+    appState.zaqueus.unshift({
+      id: `zaq_${Date.now()}`,
+      address: form.get("address"),
+      start,
+      end: addWeeks(start, 5),
+      hosts: form.get("hosts"),
+      leaders: form.get("leaders"),
+      initialPeople: Number(form.get("initialPeople") || 0),
+      weekday: form.get("weekday"),
+      time: form.get("time"),
+      week: 1,
+      weekVisits: 0,
+      weekVisitors: 0,
+      weeklyPeople: Number(form.get("initialPeople") || 0),
+      createdAt: new Date().toISOString(),
+    });
+    saveAppState();
+    event.currentTarget.reset();
+    updateZaqueuEndDate();
+    renderAll();
+  });
+
+  document.querySelector("#zaqueu-material-filter")?.addEventListener("change", (event) => {
+    renderMaterials(event.target.value);
+  });
+
+  document.querySelector("#calendar-month")?.addEventListener("change", renderCalendar);
+
+  document.querySelector("#zaqueu-files")?.addEventListener("change", (event) => {
+    Array.from(event.target.files || []).forEach((file) => {
+      appState.zaqueuMaterials.unshift({
+        title: file.name,
+        type: file.type.includes("pdf") || file.name.toLowerCase().endsWith(".pdf") ? "pdf" : "foto",
+        description: "Arquivo selecionado no protótipo local.",
+        createdAt: new Date().toISOString(),
+      });
+    });
+    saveAppState();
+    renderMaterials(document.querySelector("#zaqueu-material-filter")?.value || "todos");
+  });
+
+  document.querySelectorAll("[data-library-category]").forEach((button) => {
+    button.addEventListener("click", () => {
+      document.querySelectorAll("[data-library-category]").forEach((item) => item.classList.remove("active"));
+      button.classList.add("active");
+      renderLibrary(button.dataset.libraryCategory);
+    });
+  });
+
+  document.querySelector("#focus-library-form")?.addEventListener("click", () => {
+    openAdmDrawer("content");
+    window.setTimeout(() => document.querySelector("#library-form input[name='title']")?.focus(), 80);
+  });
+
+  document.querySelector("#focus-notification-form")?.addEventListener("click", () => {
+    openAdmDrawer("notify");
+    window.setTimeout(() => document.querySelector("#notification-form input[name='title']")?.focus(), 80);
+  });
+
+  document.querySelector("#library-form")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    if (!isAdmin()) return;
+    const form = new FormData(event.currentTarget);
+    const file = form.get("file");
+    const link = form.get("link");
+    appState.libraryItems.unshift({
+      id: `lib_${Date.now()}`,
+      title: form.get("title"),
+      category: form.get("category"),
+      description: form.get("description"),
+      kind: link ? "LINK" : file?.name?.toLowerCase().endsWith(".pdf") ? "PDF" : file?.name ? "FOTO" : "ADM",
+      link,
+      fileName: file?.name || "",
+      createdBy: currentUser.id,
+      createdAt: new Date().toISOString(),
+    });
+    saveAppState();
+    event.currentTarget.reset();
+    renderLibrary();
+  });
+
+  document.querySelector("#notification-form")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    if (!isAdmin()) return;
+    const form = new FormData(event.currentTarget);
+    const audienceLabel = event.currentTarget.querySelector(`[value="${form.get("audience")}"]`)?.textContent || "Todos os usuários";
+    appState.notifications.unshift({
+      id: `not_${Date.now()}`,
+      title: form.get("title"),
+      audience: audienceLabel,
+      message: form.get("message"),
+      date: formatDate(formatDateLocal()),
+      createdBy: currentUser.id,
+      createdAt: new Date().toISOString(),
+    });
+    saveAppState();
+    event.currentTarget.reset();
+    renderNotifications();
+  });
+}
+
+wireAuth();
+wireEvents();
+showAuthMode("login");
+
+const sessionUser = appState.users.find((user) => user.id === localStorage.getItem(SESSION_KEY));
+if (sessionUser) {
+  authenticateAs(sessionUser);
+} else {
+  document.body.classList.remove("is-authenticated", "is-admin", "can-dashboard");
+}
+
+</script>
+  </body>
+</html>
+

@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>APPIGREJA - Notificações</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell" id="app-shell">
+      <main class="main" id="main-content">
+        <section class="screen" id="notificacoes" aria-labelledby="notificacoes-title">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Avisos Internos</p>
+              <h2 id="notificacoes-title">Notificações</h2>
+            </div>
+            <button class="primary-button admin-only" type="button" id="focus-notification-form">Nova notificação</button>
+          </div>
+
+          <section class="panel wide">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Mural</p>
+                <h3>Notificações para seu perfil</h3>
+              </div>
+            </div>
+            <div class="notification-list" id="notification-list"></div>
+          </section>
+        </section>
+      </main>
+    </div>
+    <script src="app.js"></script>
+  </body>
+</html>

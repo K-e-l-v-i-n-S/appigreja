@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>APPIGREJA - Acesso</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <section class="auth-screen" id="auth-screen" aria-labelledby="auth-title">
+      <div class="auth-card">
+        <div class="auth-brand">
+          <div class="brand-mark" aria-hidden="true">AI</div>
+          <div>
+            <p class="eyebrow">Acesso Multi-Nível</p>
+            <h1 id="auth-title">APPIGREJA</h1>
+            <span>Entre ou cadastre seu e-mail único para acessar o sistema.</span>
+          </div>
+        </div>
+
+        <div class="auth-tabs" role="group" aria-label="Escolher acesso">
+          <button class="active" type="button" id="show-login">Entrar</button>
+          <button type="button" id="show-register">Cadastrar</button>
+        </div>
+
+        <form class="auth-form active" id="login-form">
+          <label>
+            E-mail cadastrado
+            <input name="login" type="email" placeholder="seuemail@exemplo.com" autocomplete="email" required />
+          </label>
+          <label>
+            Senha
+            <input name="password" type="password" autocomplete="current-password" required />
+          </label>
+          <button class="primary-button" type="submit">Entrar</button>
+        </form>
+
+        <form class="auth-form" id="register-form">
+          <label>
+            Nome completo
+            <input name="name" type="text" placeholder="Seu nome e sobrenome" autocomplete="name" required />
+          </label>
+          <label>
+            E-mail único (1 por usuário)
+            <input name="login" type="email" placeholder="seuemail@exemplo.com" autocomplete="email" required />
+          </label>
+          <label>
+            Senha
+            <input name="password" type="password" autocomplete="new-password" minlength="4" required />
+          </label>
+          <label>
+            Igreja vinculada
+            <select name="churchId" required>
+              <option value="sede">Igreja Sede (Bispo Wagner)</option>
+              <option value="campineiro">Igreja Campineiro (Pastora Lindamir)</option>
+              <option value="mogi">Igreja Mogi Guaçu (Pastor Paulo)</option>
+            </select>
+          </label>
+          <button class="primary-button" type="submit">Criar cadastro</button>
+        </form>
+
+        <p class="auth-message" id="auth-message"></p>
+        <small>Segurança ativa: é permitido apenas 1 cadastro por endereço de e-mail. Novos cadastros entram como Obreiro (o 1º cadastro torna-se ADM).</small>
+      </div>
+    </section>
+
+    <script src="app.js"></script>
+  </body>
+</html>
