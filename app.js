@@ -1,8 +1,8 @@
 const STORAGE_KEY = "appigreja_prototype_state_v1";
 const SESSION_KEY = "appigreja_prototype_session_v1";
 
-// COLE AQUI O LINK DO SEU FIREBASE REALTIME DATABASE (ex: "https://appigreja-xxxxx-default-rtdb.firebaseio.com")
-const CLOUD_DB_URL = "https://appigreja-1f504-default-rtdb.firebaseio.com/";
+// COLE AQUI O LINK DO SEU FIREBASE REALTIME DATABASE QUANDO CRIAR (ex: "https://appigreja-xxxxx-default-rtdb.firebaseio.com")
+const CLOUD_DB_URL = "";
 
 const CHURCHES = {
   sede: { name: "Igreja Sede", pastor: "Bispo Wagner", pastorId: "bispo-wagner" },
@@ -81,13 +81,25 @@ function normalizeStateData(raw) {
     u.church = CHURCHES[u.churchId].name;
     u.pastor = CHURCHES[u.churchId].pastor;
     u.pastorId = CHURCHES[u.churchId].pastorId;
+    if (!ROLE_LABELS[u.roleId]) {
+      u.roleId = "obreiro";
+    }
+    u.role = ROLE_LABELS[u.roleId];
   });
+
+  // Garante que se existir usuário cadastrado, mas nenhum for ADM, o 1º usuário vira ADM automaticamente
+  if (state.users.length > 0 && !state.users.some((u) => u.roleId === "adm")) {
+    state.users[0].roleId = "adm";
+    state.users[0].role = ROLE_LABELS.adm;
+  }
+
   state.visits.forEach((v) => {
     v.churchId = normalizeChurchId(v.churchId);
     v.church = CHURCHES[v.churchId].name;
     v.pastor = CHURCHES[v.churchId].pastor;
     v.pastorId = CHURCHES[v.churchId].pastorId;
   });
+
   return state;
 }
 
@@ -99,7 +111,9 @@ function getCloudEndpoint() {
 function loadAppState() {
   try {
     const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
-    return normalizeStateData(parsed);
+    const state = normalizeStateData(parsed);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    return state;
   } catch {
     return emptyState();
   }
@@ -123,11 +137,10 @@ async function syncFromCloud() {
         renderAll();
       }
     } else if (appState.users.length > 0) {
-      // Se o banco na nuvem estiver vazio mas o PC já tiver cadastros locais, sobe os dados locais para a nuvem
       await saveAppState();
     }
   } catch (err) {
-    console.warn("Modo offline/local ativo:", err);
+    console.warn("Modo local ativo:", err);
   }
 }
 
@@ -142,7 +155,7 @@ async function saveAppState() {
       body: JSON.stringify(appState),
     });
   } catch (err) {
-    console.warn("Falha ao sincronizar com a nuvem, salvo localmente:", err);
+    console.warn("Salvo localmente:", err);
   }
 }
 
@@ -256,7 +269,7 @@ function isAdmin() {
 }
 
 function canManageRoles() {
-  return ["adm", "bispo"].includes(currentUser?.roleId);
+  return ["adm", "bispo", "pastor"].includes(currentUser?.roleId);
 }
 
 function hasGlobalScope() {
@@ -324,6 +337,24 @@ function logout() {
   window.location.href = "index.html";
 }
 
+function switchAdmTab(mode) {
+  const modes = ["content", "notify", "calendar", "users"];
+  modes.forEach((m) => {
+    const radio = document.querySelector(`#adm-mode-${m}`);
+    const label = document.querySelector(`label[for="adm-mode-${m}"]`);
+    const panel = document.querySelector(`[data-adm-panel="${m}"]`);
+    const isActive = m === mode;
+    if (radio) radio.checked = isActive;
+    if (label) {
+      label.style.background = isActive ? "var(--green)" : "transparent";
+      label.style.color = isActive ? "#ffffff" : "var(--muted)";
+    }
+    if (panel) {
+      panel.style.display = isActive ? "grid" : "none";
+    }
+  });
+}
+
 function injectSharedShell() {
   const shell = document.querySelector("#app-shell");
   const main = document.querySelector("#main-content");
@@ -386,16 +417,37 @@ function injectSharedShell() {
   shell.insertAdjacentHTML("afterbegin", sidebarHtml);
   main.insertAdjacentHTML("afterbegin", topbarHtml);
 
+  // Injeta um painel grande de Gestão de Pessoas e Cargos no final do Dashboard e da Visão Geral
+  if (canManageRoles() && (currentPage === "dashboard.html" || currentPage === "visao.html")) {
+    const mainScreen = main.querySelector(".screen");
+    if (mainScreen && !document.querySelector("#page-users-section")) {
+      mainScreen.insertAdjacentHTML(
+        "beforeend",
+        `
+        <section class="panel wide" id="page-users-section" style="margin-top: 18px;">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Controle de Hierarquia e E-mail Único</p>
+              <h3>Pessoas Registradas no Sistema (<span id="registered-users-count">0</span>)</h3>
+            </div>
+          </div>
+          <div class="visit-list" id="page-users-list"></div>
+        </section>
+      `
+      );
+    }
+  }
+
   if (isAdmin()) {
     const admHtml = `
       <input class="adm-toggle" type="checkbox" id="adm-drawer-toggle" />
       <div class="adm-chat admin-only" aria-label="Painel rápido ADM">
         <label class="adm-fab" for="adm-drawer-toggle">ADM</label>
         <section class="adm-panel">
-          <input class="adm-mode" type="radio" name="adm-mode" id="adm-mode-content" checked />
+          <input class="adm-mode" type="radio" name="adm-mode" id="adm-mode-content" />
           <input class="adm-mode" type="radio" name="adm-mode" id="adm-mode-notify" />
           <input class="adm-mode" type="radio" name="adm-mode" id="adm-mode-calendar" />
-          <input class="adm-mode" type="radio" name="adm-mode" id="adm-mode-users" />
+          <input class="adm-mode" type="radio" name="adm-mode" id="adm-mode-users" checked />
           <header class="adm-header">
             <div>
               <p class="eyebrow">Gestão (${escapeHtml(ROLE_LABELS[currentUser.roleId])})</p>
@@ -403,13 +455,14 @@ function injectSharedShell() {
             </div>
             <label class="adm-minimize" for="adm-drawer-toggle">Minimizar</label>
           </header>
-          <div class="adm-tabs" style="grid-template-columns: repeat(${canManageRoles() ? 4 : 3}, 1fr);">
-            <label for="adm-mode-content">Conteúdo</label>
-            <label for="adm-mode-notify">Aviso</label>
-            <label for="adm-mode-calendar">Agenda</label>
-            ${canManageRoles() ? `<label for="adm-mode-users">Cargos</label>` : ""}
+          <div class="adm-tabs" style="grid-template-columns: repeat(4, 1fr);">
+            <label for="adm-mode-users" data-tab-btn="users">Cargos</label>
+            <label for="adm-mode-content" data-tab-btn="content">Conteúdo</label>
+            <label for="adm-mode-notify" data-tab-btn="notify">Aviso</label>
+            <label for="adm-mode-calendar" data-tab-btn="calendar">Agenda</label>
           </div>
-          <form class="stack-form adm-content-form" id="library-form">
+          <div class="stack-form adm-users-panel" id="adm-users-list" data-adm-panel="users"></div>
+          <form class="stack-form adm-content-form" id="library-form" data-adm-panel="content">
             <label>
               Tipo
               <select name="category">
@@ -436,7 +489,7 @@ function injectSharedShell() {
             </label>
             <button class="primary-button" type="submit">Adicionar na biblioteca</button>
           </form>
-          <form class="stack-form adm-notify-form" id="notification-form">
+          <form class="stack-form adm-notify-form" id="notification-form" data-adm-panel="notify">
             <label>
               Destinatários
               <select name="audience">
@@ -457,7 +510,7 @@ function injectSharedShell() {
             </label>
             <button class="primary-button" type="submit">Gerar notificação</button>
           </form>
-          <form class="stack-form adm-calendar-form" id="calendar-form">
+          <form class="stack-form adm-calendar-form" id="calendar-form" data-adm-panel="calendar">
             <label>
               Evento
               <input name="title" type="text" placeholder="Nome do culto ou evento" required />
@@ -486,52 +539,60 @@ function injectSharedShell() {
             </label>
             <button class="primary-button" type="submit">Salvar no Calendário</button>
           </form>
-          <div class="stack-form adm-users-panel" id="adm-users-list"></div>
         </section>
       </div>
     `;
     document.body.insertAdjacentHTML("beforeend", admHtml);
 
-    const style = document.createElement("style");
-    style.textContent = `
-      .adm-users-panel { display: none; }
-      #adm-mode-users:checked ~ .adm-tabs label[for="adm-mode-users"] { background: var(--green); color: #fff; }
-      #adm-mode-users:checked ~ .adm-users-panel { display: grid; gap: 10px; }
-    `;
-    document.head.appendChild(style);
+    document.querySelectorAll("[data-tab-btn]").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.preventDefault();
+        switchAdmTab(btn.dataset.tabBtn);
+      });
+    });
+
+    // Abre a aba Cargos por padrão quando clicar no botão ADM
+    switchAdmTab("users");
   }
 }
 
-function renderUsersRoleManager() {
-  const container = document.querySelector("#adm-users-list");
-  if (!container || !canManageRoles()) return;
-
-  container.innerHTML = appState.users
-    .map(
-      (u) => `
-        <div style="padding: 10px; border: 1px solid var(--line); border-radius: var(--radius); background: #f8faf9; display: grid; gap: 8px;">
-          <div>
-            <strong>${escapeHtml(u.name)}</strong>
-            <small style="display:block; color: var(--muted);">E-mail único: ${escapeHtml(u.login)}</small>
-          </div>
-          <div class="form-grid one" style="gap: 8px;">
-            <select class="user-role-select" data-user-id="${escapeHtml(u.id)}" aria-label="Cargo de ${escapeHtml(u.name)}">
-              ${Object.entries(ROLE_LABELS)
-                .map(([roleKey, label]) => `<option value="${roleKey}" ${u.roleId === roleKey ? "selected" : ""}>${label}</option>`)
-                .join("")}
-            </select>
-            <select class="user-church-select" data-user-id="${escapeHtml(u.id)}" aria-label="Igreja de ${escapeHtml(u.name)}">
-              ${Object.entries(CHURCHES)
-                .map(([chKey, chObj]) => `<option value="${chKey}" ${u.churchId === chKey ? "selected" : ""}>${chObj.name}</option>`)
-                .join("")}
-            </select>
-          </div>
+function buildUserRoleCardHtml(u) {
+  const isSelf = u.id === currentUser?.id;
+  return `
+    <div class="visit-item" style="grid-template-columns: 1fr; gap: 10px; background: #f8faf9;">
+      <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;">
+        <div>
+          <strong>${escapeHtml(u.name)} ${isSelf ? "(Você)" : ""}</strong>
+          <small style="display:block; color: var(--muted);">E-mail: ${escapeHtml(u.login)}</small>
         </div>
-      `
-    )
-    .join("");
+        <span class="tag">${escapeHtml(ROLE_LABELS[u.roleId] || u.role)} - ${escapeHtml(u.church)}</span>
+      </div>
+      <div class="form-grid one" style="gap: 8px;">
+        <label style="font-size: 12px; color: var(--muted); font-weight: 700;">
+          Nível de Hierarquia
+          <select class="user-role-select" data-user-id="${escapeHtml(u.id)}">
+            ${Object.entries(ROLE_LABELS)
+              .map(([roleKey, label]) => `<option value="${roleKey}" ${u.roleId === roleKey ? "selected" : ""}>${label}</option>`)
+              .join("")}
+          </select>
+        </label>
+        <label style="font-size: 12px; color: var(--muted); font-weight: 700;">
+          Igreja Vinculada
+          <select class="user-church-select" data-user-id="${escapeHtml(u.id)}">
+            ${Object.entries(CHURCHES)
+              .map(([chKey, chObj]) => `<option value="${chKey}" ${u.churchId === chKey ? "selected" : ""}>${chObj.name} (${chObj.pastor})</option>`)
+              .join("")}
+          </select>
+        </label>
+      </div>
+    </div>
+  `;
+}
 
-  container.querySelectorAll(".user-role-select").forEach((select) => {
+function wireUserRoleSelects(rootElement) {
+  if (!rootElement) return;
+
+  rootElement.querySelectorAll(".user-role-select").forEach((select) => {
     select.addEventListener("change", async () => {
       const targetUser = appState.users.find((u) => u.id === select.dataset.userId);
       if (!targetUser) return;
@@ -546,7 +607,7 @@ function renderUsersRoleManager() {
     });
   });
 
-  container.querySelectorAll(".user-church-select").forEach((select) => {
+  rootElement.querySelectorAll(".user-church-select").forEach((select) => {
     select.addEventListener("change", async () => {
       const targetUser = appState.users.find((u) => u.id === select.dataset.userId);
       if (!targetUser) return;
@@ -563,6 +624,29 @@ function renderUsersRoleManager() {
       }
     });
   });
+}
+
+function renderUsersRoleManager() {
+  if (!canManageRoles()) return;
+
+  const countBadge = document.querySelector("#registered-users-count");
+  if (countBadge) countBadge.textContent = String(appState.users.length);
+
+  const cardsHtml = appState.users.length
+    ? appState.users.map(buildUserRoleCardHtml).join("")
+    : emptyCard("Nenhuma pessoa registrada ainda.");
+
+  const drawerContainer = document.querySelector("#adm-users-list");
+  if (drawerContainer) {
+    drawerContainer.innerHTML = cardsHtml;
+    wireUserRoleSelects(drawerContainer);
+  }
+
+  const pageContainer = document.querySelector("#page-users-list");
+  if (pageContainer) {
+    pageContainer.innerHTML = cardsHtml;
+    wireUserRoleSelects(pageContainer);
+  }
 }
 
 function renderVisitUserFields() {
@@ -1049,9 +1133,8 @@ function updateZaqueuEndDate() {
 function openAdmDrawer(mode = "content") {
   if (!isAdmin()) return;
   const drawer = document.querySelector("#adm-drawer-toggle");
-  const modeRadio = document.querySelector(`#adm-mode-${mode}`);
   if (drawer) drawer.checked = true;
-  if (modeRadio) modeRadio.checked = true;
+  switchAdmTab(mode);
 }
 
 function readFileAsDataUrl(file) {
@@ -1377,7 +1460,6 @@ async function initApp() {
   wireEvents();
   renderAll();
 
-  // Busca atualizações recentes da nuvem em segundo plano
   await syncFromCloud();
 }
 
