@@ -1,7 +1,7 @@
 const STORAGE_KEY = "appigreja_prototype_state_v1";
 const SESSION_KEY = "appigreja_prototype_session_v1";
 
-// Se usar o Firebase depois, cole a URL aqui (ex: "https://appigreja-default-rtdb.firebaseio.com")
+// Se usar o Firebase Realtime Database, cole a URL aqui (ex: "https://appigreja-default-rtdb.firebaseio.com")
 const CLOUD_DB_URL = "";
 
 const CHURCHES = {
@@ -109,7 +109,9 @@ function getCloudEndpoint() {
 
 function loadAppState() {
   try {
-    const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return emptyState();
+    const parsed = JSON.parse(raw);
     const state = normalizeStateData(parsed);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     return state;
@@ -127,7 +129,7 @@ async function syncFromCloud() {
     const cloudData = await response.json();
 
     if (cloudData && typeof cloudData === "object") {
-      // Banco na nuvem tem dados: atualiza o navegador com a versão da nuvem
+      // O banco na nuvem possui dados: sincroniza o navegador com a nuvem
       appState = normalizeStateData(cloudData);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
       const savedUserId = localStorage.getItem(SESSION_KEY);
@@ -142,7 +144,7 @@ async function syncFromCloud() {
         renderAll();
       }
     } else if (cloudData === null) {
-      // Banco na nuvem foi apagado: limpa o cache local para não ressuscitar dados antigos
+      // O banco na nuvem foi apagado: limpa o cache local para não ressuscitar registros apagados
       appState = emptyState();
       localStorage.removeItem(STORAGE_KEY);
       localStorage.removeItem(SESSION_KEY);
@@ -155,6 +157,7 @@ async function syncFromCloud() {
     console.warn("Modo local ativo:", err);
   }
 }
+
 async function saveAppState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
   const endpoint = getCloudEndpoint();
@@ -170,7 +173,25 @@ async function saveAppState() {
   }
 }
 
-// Corrige qualquer conflito de CSS antigo garantindo que todas as telas e painéis apareçam
+async function resetEntireDatabase() {
+  if (!confirm("ATENÇÃO: Isso vai apagar TODOS os usuários, visitas, Zaqueus, eventos e notificações deste aparelho e da nuvem. Deseja zerar tudo?")) {
+    return;
+  }
+  appState = emptyState();
+  localStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem(SESSION_KEY);
+  const endpoint = getCloudEndpoint();
+  if (endpoint) {
+    try {
+      await fetch(endpoint, { method: "DELETE" });
+    } catch (err) {
+      console.warn("Erro ao limpar nuvem:", err);
+    }
+  }
+  currentUser = null;
+  window.location.replace("index.html");
+}
+
 function injectCriticalFixesCss() {
   if (document.querySelector("#appigreja-fixes-css")) return;
   const style = document.createElement("style");
@@ -193,6 +214,18 @@ function injectCriticalFixesCss() {
       border: 1px solid var(--line);
       border-radius: var(--radius);
       background: #ffffff;
+    }
+    .danger-btn {
+      color: var(--red) !important;
+      border-color: var(--red) !important;
+      background: #fff5f5 !important;
+      padding: 6px 10px !important;
+      min-height: 32px !important;
+      font-size: 12px !important;
+    }
+    .danger-btn:hover {
+      background: var(--red) !important;
+      color: #ffffff !important;
     }
     @media (max-width: 820px) {
       .user-role-row {
@@ -343,7 +376,6 @@ function getVisibleZaqueus() {
   return appState.zaqueus.filter((z) => !z.churchId || z.churchId === currentUser.churchId);
 }
 
-// Notificações visíveis para TODOS os usuários (sem esconder nada no mural)
 function getVisibleNotifications() {
   return appState.notifications || [];
 }
@@ -381,7 +413,6 @@ function injectSharedShell() {
   const main = document.querySelector("#main-content") || document.querySelector(".main");
   if (!shell || !main || !currentUser) return;
 
-  // Remove barras duplicadas caso o HTML já tenha alguma
   shell.querySelectorAll(".sidebar").forEach((el) => el.remove());
   main.querySelectorAll(".topbar").forEach((el) => el.remove());
   document.querySelectorAll(".adm-chat, #adm-drawer-toggle").forEach((el) => el.remove());
@@ -448,7 +479,7 @@ function injectSharedShell() {
   shell.insertAdjacentHTML("afterbegin", sidebarHtml);
   main.insertAdjacentHTML("afterbegin", topbarHtml);
 
-  // 1. INJETA O PAINEL DE PESSOAS REGISTRADAS E CARGOS NO TOPO DO DASHBOARD E VISÃO GERAL
+  // 1. PAINEL DE PESSOAS REGISTRADAS, CARGOS E BOTÃO DE ZERAR BANCO NO DASHBOARD E VISÃO GERAL
   const dashboardScreen = document.querySelector("#dashboard") || document.querySelector("#visao");
   if (dashboardScreen && canManageRoles() && !document.querySelector("#gestao-cargos")) {
     const heading = dashboardScreen.querySelector(".section-heading");
@@ -459,7 +490,10 @@ function injectSharedShell() {
             <p class="eyebrow">Administração de Acessos e Hierarquia</p>
             <h3>Pessoas Registradas no Sistema (<span id="registered-users-count">0</span>)</h3>
           </div>
-          <span class="status-pill" id="role-save-feedback">Altere o cargo ou igreja abaixo</span>
+          <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+            <span class="status-pill" id="role-save-feedback">Altere o cargo, igreja ou exclua abaixo</span>
+            <button class="secondary-button danger-btn" type="button" id="reset-db-btn">Zerar Tudo (Limpar Banco)</button>
+          </div>
         </div>
 
         <div class="visit-list" id="page-users-list" style="margin-top: 12px; margin-bottom: 18px;"></div>
@@ -514,7 +548,7 @@ function injectSharedShell() {
     }
   }
 
-  // 2. INJETA O FORMULÁRIO DE NOTIFICAÇÕES DIRETO EM notificacoes.html
+  // 2. FORMULÁRIO DE NOTIFICAÇÕES DIRETO EM notificacoes.html
   const notifScreen = document.querySelector("#notificacoes");
   if (notifScreen && isAdmin() && !document.querySelector("#inline-notification-form-panel")) {
     const heading = notifScreen.querySelector(".section-heading");
@@ -533,7 +567,7 @@ function injectSharedShell() {
               <input name="title" type="text" placeholder="Ex: Reunião Geral de Obreiros" required />
             </label>
             <label>
-              Destaque de Público (Aparece no mural para todos)
+              Destaque de Público (Visível no mural para todos)
               <select name="audience">
                 <option value="todos">Todos os usuários</option>
                 <option value="obreiro">Obreiros</option>
@@ -561,7 +595,7 @@ function injectSharedShell() {
     }
   }
 
-  // 3. INJETA O FORMULÁRIO DE EVENTOS DIRETO EM calendario.html
+  // 3. FORMULÁRIO DE EVENTOS DIRETO EM calendario.html
   const calScreen = document.querySelector("#calendario");
   if (calScreen && isAdmin() && !document.querySelector("#inline-calendar-form-panel")) {
     const heading = calScreen.querySelector(".section-heading");
@@ -615,7 +649,7 @@ function injectSharedShell() {
     }
   }
 
-  // 4. INJETA O FORMULÁRIO DE BIBLIOTECA DIRETO EM biblioteca.html
+  // 4. FORMULÁRIO DE BIBLIOTECA DIRETO EM biblioteca.html
   const libScreen = document.querySelector("#biblioteca");
   if (libScreen && isAdmin() && !document.querySelector("#inline-library-form-panel")) {
     const heading = libScreen.querySelector(".section-heading");
@@ -693,8 +727,11 @@ function buildUserRoleCardHtml(u) {
             .join("")}
         </select>
       </label>
-      <div style="display: flex; align-items: center; gap: 8px;">
+      <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
         <span class="tag">${escapeHtml(ROLE_LABELS[u.roleId] || u.role)}</span>
+        <button class="secondary-button danger-btn delete-user-btn" type="button" data-user-id="${escapeHtml(u.id)}">
+          Excluir
+        </button>
       </div>
     </div>
   `;
@@ -734,6 +771,26 @@ function wireUserRoleSelects(rootElement) {
       if (feedback) feedback.textContent = `Igreja de ${targetUser.name} alterada para ${ch.name}!`;
       if (targetUser.id === currentUser.id) {
         window.location.reload();
+      } else {
+        renderAll();
+      }
+    });
+  });
+
+  rootElement.querySelectorAll(".delete-user-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const userId = btn.dataset.userId;
+      const targetUser = appState.users.find((u) => u.id === userId);
+      if (!targetUser) return;
+      if (!confirm(`Tem certeza que deseja excluir o cadastro de "${targetUser.name}" (${targetUser.login})?`)) {
+        return;
+      }
+
+      appState.users = appState.users.filter((u) => u.id !== userId);
+      await saveAppState();
+
+      if (userId === currentUser?.id) {
+        logout();
       } else {
         renderAll();
       }
@@ -812,6 +869,7 @@ function emptyCard(message) {
 }
 
 function visitCard(visit) {
+  const canDelete = isAdmin() || visit.visitorId === currentUser?.id;
   return `
     <article class="visit-item" data-church="${escapeHtml(visit.churchId)}" data-worker="${escapeHtml(visit.visitorId)}" data-pastor="${escapeHtml(visit.pastorId)}">
       <div>
@@ -828,9 +886,26 @@ function visitCard(visit) {
       </div>
       <div class="tag-row">
         <span class="status-pill">${getCloudEndpoint() ? "Sincronizado" : "Salvo"}</span>
+        ${
+          canDelete
+            ? `<button class="secondary-button danger-btn delete-visit-btn" type="button" data-visit-id="${escapeHtml(visit.id)}">Excluir</button>`
+            : ""
+        }
       </div>
     </article>
   `;
+}
+
+function wireVisitDeleteButtons() {
+  document.querySelectorAll(".delete-visit-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const visitId = btn.dataset.visitId;
+      if (!confirm("Deseja realmente excluir este registro de visita?")) return;
+      appState.visits = appState.visits.filter((v) => v.id !== visitId);
+      await saveAppState();
+      renderAll();
+    });
+  });
 }
 
 function renderVisits() {
@@ -870,6 +945,7 @@ function renderVisits() {
       : emptyCard("O Dashboard começará a mostrar visitas assim que alguém registrar a primeira.");
   }
 
+  wireVisitDeleteButtons();
   renderVisitMetrics();
 }
 
@@ -966,6 +1042,11 @@ function renderZaqueus() {
           </div>
           <div class="zaqueu-actions">
             <button class="secondary-button update-week" type="button" data-id="${escapeHtml(zaqueu.id)}">Avançar para próxima semana</button>
+            ${
+              canManageZaqueu()
+                ? `<button class="secondary-button danger-btn delete-zaqueu-btn" type="button" data-id="${escapeHtml(zaqueu.id)}">Excluir Zaqueu</button>`
+                : ""
+            }
           </div>
         </article>
       `
@@ -1006,6 +1087,17 @@ function renderZaqueus() {
         item.weekVisitors = nextSaved.weekVisitors ?? 0;
         item.weeklyPeople = nextSaved.weeklyPeople ?? item.weeklyPeople ?? 0;
       }
+      await saveAppState();
+      renderZaqueus();
+      renderOverview();
+    });
+  });
+
+  document.querySelectorAll(".delete-zaqueu-btn").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const zaqueuId = button.dataset.id;
+      if (!confirm("Deseja realmente excluir este Zaqueu?")) return;
+      appState.zaqueus = appState.zaqueus.filter((z) => z.id !== zaqueuId);
       await saveAppState();
       renderZaqueus();
       renderOverview();
@@ -1091,7 +1183,7 @@ function renderMaterials(filter = "todos") {
   }
   container.innerHTML = items
     .map(
-      (item) => `
+      (item, idx) => `
         <article class="content-card" data-type="${escapeHtml(item.type)}">
           <div class="content-art" aria-hidden="true">${item.type === "pdf" ? "PDF" : "FOTO"}</div>
           <div>
@@ -1105,11 +1197,26 @@ function renderMaterials(filter = "todos") {
                 ? `<a class="secondary-button" href="${item.dataUrl}" download="${escapeHtml(item.title)}" target="_blank">Abrir / Baixar</a>`
                 : `<button class="secondary-button" type="button" disabled>Arquivo salvo</button>`
             }
+            ${
+              isAdmin()
+                ? `<button class="secondary-button danger-btn delete-material-btn" type="button" data-idx="${idx}">Excluir</button>`
+                : ""
+            }
           </div>
         </article>
       `
     )
     .join("");
+
+  container.querySelectorAll(".delete-material-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const idx = Number(btn.dataset.idx);
+      if (!confirm("Excluir este material do Zaqueu?")) return;
+      appState.zaqueuMaterials.splice(idx, 1);
+      await saveAppState();
+      renderMaterials(document.querySelector("#zaqueu-material-filter")?.value || "todos");
+    });
+  });
 }
 
 function renderLibrary(category = "todos") {
@@ -1139,11 +1246,26 @@ function renderLibrary(category = "todos") {
                   ? `<a class="secondary-button" href="${item.dataUrl}" download="${escapeHtml(item.fileName || item.title)}" target="_blank">Baixar arquivo</a>`
                   : `<span class="tag">Disponível</span>`
             }
+            ${
+              isAdmin()
+                ? `<button class="secondary-button danger-btn delete-lib-btn" type="button" data-id="${escapeHtml(item.id)}">Excluir</button>`
+                : ""
+            }
           </div>
         </article>
       `
     )
     .join("");
+
+  container.querySelectorAll(".delete-lib-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const id = btn.dataset.id;
+      if (!confirm("Excluir este item da biblioteca?")) return;
+      appState.libraryItems = appState.libraryItems.filter((i) => i.id !== id);
+      await saveAppState();
+      renderLibrary(category);
+    });
+  });
 }
 
 function renderNotifications() {
@@ -1158,9 +1280,16 @@ function renderNotifications() {
     .map(
       (notification) => `
         <article class="notification-item">
-          <div class="tag-row">
-            <span class="tag">Público: ${escapeHtml(notification.audience || "Todos os usuários")}</span>
-            <span class="status-pill">${escapeHtml(notification.date)}</span>
+          <div class="tag-row" style="justify-content: space-between;">
+            <div class="tag-row">
+              <span class="tag">Público: ${escapeHtml(notification.audience || "Todos os usuários")}</span>
+              <span class="status-pill">${escapeHtml(notification.date)}</span>
+            </div>
+            ${
+              isAdmin()
+                ? `<button class="secondary-button danger-btn delete-notif-btn" type="button" data-id="${escapeHtml(notification.id)}">Excluir</button>`
+                : ""
+            }
           </div>
           <h3>${escapeHtml(notification.title)}</h3>
           <p>${escapeHtml(notification.message)}</p>
@@ -1168,6 +1297,16 @@ function renderNotifications() {
       `
     )
     .join("");
+
+  container.querySelectorAll(".delete-notif-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const id = btn.dataset.id;
+      if (!confirm("Excluir esta notificação?")) return;
+      appState.notifications = appState.notifications.filter((n) => n.id !== id);
+      await saveAppState();
+      renderNotifications();
+    });
+  });
 }
 
 function renderCalendar() {
@@ -1210,16 +1349,22 @@ function renderCalendar() {
 
   board.innerHTML = cells.join("");
 
-  // Exibe os eventos do mês selecionado; se não houver no mês, mostra todos os eventos futuros/cadastrados
   const eventsToDisplay = monthEvents.length ? monthEvents : allEvents;
   list.innerHTML = eventsToDisplay.length
     ? eventsToDisplay
         .map(
           (event) => `
             <article class="calendar-event">
-              <div class="tag-row">
-                <span class="tag">${escapeHtml(formatDate(event.date))}</span>
-                <span class="tag">${escapeHtml(event.church || "Igreja Sede")}</span>
+              <div class="tag-row" style="justify-content: space-between;">
+                <div class="tag-row">
+                  <span class="tag">${escapeHtml(formatDate(event.date))}</span>
+                  <span class="tag">${escapeHtml(event.church || "Igreja Sede")}</span>
+                </div>
+                ${
+                  isAdmin()
+                    ? `<button class="secondary-button danger-btn delete-cal-btn" type="button" data-id="${escapeHtml(event.id)}">Excluir</button>`
+                    : ""
+                }
               </div>
               <strong>${escapeHtml(event.title || "Evento")}</strong>
               <p>${escapeHtml(event.description || "Programação oficial da igreja.")}</p>
@@ -1229,6 +1374,16 @@ function renderCalendar() {
         )
         .join("")
     : emptyCard("Nenhum evento cadastrado ainda. Use o formulário acima para adicionar eventos.");
+
+  list.querySelectorAll(".delete-cal-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const id = btn.dataset.id;
+      if (!confirm("Excluir este evento do calendário?")) return;
+      appState.calendarEvents = appState.calendarEvents.filter((ev) => ev.id !== id);
+      await saveAppState();
+      renderCalendar();
+    });
+  });
 }
 
 function updateZaqueuEndDate() {
@@ -1342,8 +1497,8 @@ function wireAuth() {
 
 function wireEvents() {
   document.querySelector("#logout-button")?.addEventListener("click", logout);
+  document.querySelector("#reset-db-btn")?.addEventListener("click", resetEntireDatabase);
 
-  // Botão rápido para promover a conta atual a ADM durante testes da faculdade
   document.querySelector("#promote-self-adm")?.addEventListener("click", async () => {
     if (!currentUser) return;
     currentUser.roleId = "adm";
@@ -1352,7 +1507,6 @@ function wireEvents() {
     window.location.href = "dashboard.html";
   });
 
-  // Cadastro direto de pessoa com atribuição de cargo pelo painel ADM no Dashboard
   document.querySelector("#admin-add-user-form")?.addEventListener("submit", async (event) => {
     event.preventDefault();
     const formElement = event.currentTarget;
@@ -1573,7 +1727,6 @@ function wireEvents() {
     });
     await saveAppState();
     formElement.reset();
-    // Muda o filtro do calendário automaticamente para o mês do evento criado para ele aparecer na hora
     const monthInput = document.querySelector("#calendar-month");
     if (monthInput && eventDate) {
       monthInput.value = eventDate.slice(0, 7);
