@@ -253,7 +253,11 @@ async function resetEntireDatabase() {
   const endpoint = getCloudEndpoint("appigreja_state");
   if (endpoint) {
     try {
-      await fetch(endpoint, { method: "DELETE" });
+      await Promise.all([
+        fetch(getCloudEndpoint("appigreja_state"), { method: "DELETE" }),
+        fetch(getCloudEndpoint("appigreja_radio_chat"), { method: "DELETE" }),
+        fetch(getCloudEndpoint("appigreja_radio_chunk"), { method: "DELETE" }),
+      ]);
     } catch (err) {
       console.warn("Erro ao limpar nuvem:", err);
     }
@@ -1240,15 +1244,23 @@ function renderRadioPage() {
   const chatList = document.querySelector("#radio-chat-list");
   if (chatList) {
     const msgs = appState.radioMessages || [];
+    const canModerate = isAdmin() || canBroadcastRadio();
     chatList.innerHTML = msgs.length
       ? msgs
-          .slice(0, 30)
+          .slice(0, 40)
           .map(
             (m) => `
           <div style="padding: 10px; border: 1px solid var(--line); border-radius: 6px; background: #fbfdfc;">
-            <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--muted);">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:11px; color:var(--muted);">
               <strong>${escapeHtml(m.author)} (${escapeHtml(m.church)})</strong>
-              <span>${escapeHtml(m.time)}</span>
+              <div style="display:flex; align-items:center; gap:6px;">
+                <span>${escapeHtml(m.time)}</span>
+                ${
+                  canModerate
+                    ? `<button type="button" class="delete-radio-msg-btn" data-msg-id="${escapeHtml(m.id)}" style="border:0; background:transparent; color:var(--red); font-weight:800; font-size:11px; padding:0 4px; cursor:pointer;" title="Apagar mensagem">✕</button>`
+                    : ""
+                }
+              </div>
             </div>
             <p style="margin: 4px 0 0; font-size: 14px;">${escapeHtml(m.text)}</p>
           </div>
@@ -1256,7 +1268,155 @@ function renderRadioPage() {
           )
           .join("")
       : emptyCard("Nenhuma mensagem ainda. Seja o primeiro a enviar um Amém!");
+
+    chatList.querySelectorAll(".delete-radio-msg-btn").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const msgId = btn.dataset.msgId;
+        await deleteRadioChatMessage(msgId);
+      });
+    });
   }
+}
+
+let radioChatSyncInterval = null;
+let lastRenderedChatSignature = "";
+let lastRenderedLiveSignature = "";
+
+async function syncRadioChatAndStatus() {
+  const chatEndpoint = getCloudEndpoint("appigreja_radio_chat");
+  const liveEndpoint = getCloudEndpoint("appigreja_state/radioLive");
+  if (!chatEndpoint) return;
+
+  try {
+    const [chatRes, liveRes] = await Promise.all([
+      fetch(chatEndpoint, { cache: "no-store" }),
+      fetch(liveEndpoint, { cache: "no-store" }),
+    ]);
+
+    let shouldRender = false;
+
+    if (chatRes.ok) {
+      const remoteMsgs = await chatRes.json();
+      const normalizedMsgs = Array.isArray(remoteMsgs)
+        ? remoteMsgs
+        : remoteMsgs && typeof remoteMsgs === "object"
+          ? Object.values(remoteMsgs)
+          : [];
+      const sig = JSON.stringify(normalizedMsgs);
+      if (sig !== lastRenderedChatSignature) {
+        lastRenderedChatSignature = sig;
+        appState.radioMessages = normalizedMsgs;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+        shouldRender = true;
+      }
+    }
+
+    if (liveRes.ok) {
+      const remoteLive = await liveRes.json();
+      if (remoteLive && typeof remoteLive === "object") {
+        const liveSig = JSON.stringify(remoteLive);
+        if (liveSig !== lastRenderedLiveSignature) {
+          lastRenderedLiveSignature = liveSig;
+          appState.radioLive = { ...appState.radioLive, ...remoteLive };
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+          shouldRender = true;
+        }
+      }
+    }
+
+    if (shouldRender && getCurrentPage() === "radio.html") {
+      renderRadioPage();
+    }
+  } catch (err) {
+    // Ignora oscilações momentâneas de rede
+  }
+}
+
+async function sendRadioChatMessage(text) {
+  if (!currentUser || !text) return;
+  const chatEndpoint = getCloudEndpoint("appigreja_radio_chat");
+  const newMsg = {
+    id: `rmsg_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    author: currentUser.name,
+    church: currentUser.church,
+    text,
+    time: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+  };
+
+  let currentList = Array.isArray(appState.radioMessages) ? [...appState.radioMessages] : [];
+  if (chatEndpoint) {
+    try {
+      const res = await fetch(chatEndpoint, { cache: "no-store" });
+      if (res.ok) {
+        const remote = await res.json();
+        if (Array.isArray(remote)) {
+          currentList = remote;
+        } else if (remote && typeof remote === "object") {
+          currentList = Object.values(remote);
+        }
+      }
+    } catch {
+      // usa lista local se falhar leitura prévia
+    }
+  }
+
+  currentList.unshift(newMsg);
+  currentList = currentList.slice(0, 50);
+  appState.radioMessages = currentList;
+  lastRenderedChatSignature = JSON.stringify(currentList);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+  renderRadioPage();
+
+  if (chatEndpoint) {
+    try {
+      await fetch(chatEndpoint, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(currentList),
+      });
+      await fetch(getCloudEndpoint("appigreja_state/radioMessages"), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(currentList),
+      });
+    } catch (err) {
+      console.warn("Erro ao sincronizar mensagem do chat:", err);
+    }
+  }
+}
+
+async function deleteRadioChatMessage(msgId) {
+  const chatEndpoint = getCloudEndpoint("appigreja_radio_chat");
+  let currentList = Array.isArray(appState.radioMessages) ? [...appState.radioMessages] : [];
+  currentList = currentList.filter((m) => m.id !== msgId);
+  appState.radioMessages = currentList;
+  lastRenderedChatSignature = JSON.stringify(currentList);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+  renderRadioPage();
+
+  if (chatEndpoint) {
+    try {
+      await fetch(chatEndpoint, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(currentList),
+      });
+      await fetch(getCloudEndpoint("appigreja_state/radioMessages"), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(currentList),
+      });
+    } catch (err) {
+      console.warn("Erro ao excluir mensagem do chat:", err);
+    }
+  }
+}
+
+function startRealtimeRadioSyncLoop() {
+  if (radioChatSyncInterval) clearInterval(radioChatSyncInterval);
+  syncRadioChatAndStatus();
+  const intervalMs = getCurrentPage() === "radio.html" ? 2000 : 6000;
+  radioChatSyncInterval = setInterval(syncRadioChatAndStatus, intervalMs);
 }
 
 // Transmissão Ao Vivo com trava Anti-Eco (Somente Entrada no aparelho locutor)
@@ -2236,17 +2396,8 @@ function wireEvents() {
     const form = new FormData(formEl);
     const text = String(form.get("text") || "").trim();
     if (!text) return;
-    appState.radioMessages = appState.radioMessages || [];
-    appState.radioMessages.unshift({
-      id: `rmsg_${Date.now()}`,
-      author: currentUser.name,
-      church: currentUser.church,
-      text,
-      time: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
-    });
-    await saveAppState();
     formEl.reset();
-    renderRadioPage();
+    await sendRadioChatMessage(text);
   });
 
   document.querySelector("#promote-self-adm")?.addEventListener("click", async () => {
@@ -2531,6 +2682,7 @@ async function initApp() {
   renderAll();
 
   await syncFromCloud();
+  startRealtimeRadioSyncLoop();
 }
 
 initApp();
