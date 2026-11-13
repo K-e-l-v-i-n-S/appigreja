@@ -382,9 +382,120 @@ function injectCriticalFixesCss() {
       gap: 14px;
       box-shadow: var(--shadow);
     }
+    .radio-popup-widget {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      z-index: 9999;
+      font-family: inherit;
+    }
+    .radio-mini-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: #18342f;
+      color: #ffffff;
+      border: 2px solid #2f6f5e;
+      box-shadow: 0 14px 34px rgba(0, 0, 0, 0.28);
+      cursor: pointer;
+    }
+    .radio-mini-bar.is-live {
+      border-color: #ef4444;
+      background: linear-gradient(135deg, #7f1d1d, #18342f);
+    }
+    .radio-mini-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #9ca3af;
+      flex: 0 0 12px;
+    }
+    .radio-mini-bar.is-live .radio-mini-dot {
+      background: #ef4444;
+      box-shadow: 0 0 10px #ef4444;
+    }
+    .radio-popup-modal {
+      display: none;
+      width: min(430px, calc(100vw - 24px));
+      max-height: min(720px, calc(100vh - 36px));
+      overflow-y: auto;
+      padding: 16px;
+      border-radius: 14px;
+      background: var(--surface);
+      color: var(--ink);
+      border: 2px solid #2f6f5e;
+      box-shadow: 0 24px 64px rgba(0, 0, 0, 0.32);
+      gap: 14px;
+    }
+    .radio-popup-widget.is-open .radio-mini-bar {
+      display: none;
+    }
+    .radio-popup-widget.is-open .radio-popup-modal {
+      display: grid;
+    }
+    .password-wrap {
+      position: relative;
+      display: flex;
+      align-items: center;
+      width: 100%;
+    }
+    .password-wrap input {
+      width: 100%;
+      padding-right: 44px !important;
+    }
+    .password-toggle-btn {
+      position: absolute;
+      right: 6px;
+      top: 50%;
+      transform: translateY(-50%);
+      min-height: 30px !important;
+      width: 34px !important;
+      padding: 0 !important;
+      border: 0 !important;
+      border-radius: 6px;
+      background: transparent !important;
+      color: var(--muted);
+      font-size: 17px;
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      user-select: none;
+    }
+    .password-toggle-btn:hover {
+      background: rgba(47, 111, 94, 0.1) !important;
+      color: var(--green-dark);
+    }
+    .forgot-link-btn {
+      border: 0;
+      background: transparent;
+      color: var(--teal);
+      font-size: 13px;
+      font-weight: 800;
+      padding: 4px 0;
+      text-align: right;
+      cursor: pointer;
+      justify-self: end;
+    }
+    .forgot-link-btn:hover {
+      text-decoration: underline;
+    }
+    .recovery-result-box {
+      padding: 14px;
+      border: 2px solid #9bc6bb;
+      border-radius: var(--radius);
+      background: #f5fbf8;
+      display: grid;
+      gap: 12px;
+    }
     @media (max-width: 980px) {
       .user-role-row {
         grid-template-columns: 1fr;
+      }
+      .radio-popup-widget {
+        right: 10px;
+        bottom: 10px;
       }
     }
   `;
@@ -412,7 +523,10 @@ function injectPwaTags() {
   }
 }
 
+let activeVirtualPage = "";
+
 function getCurrentPage() {
+  if (activeVirtualPage) return activeVirtualPage;
   const path = decodeURIComponent(window.location.pathname.split("/").pop() || "");
   return path && path.endsWith(".html") ? path : "index.html";
 }
@@ -458,15 +572,77 @@ function fallbackHash(value) {
   return `fallback:${hash}`;
 }
 
-async function hashPassword(password) {
+async function sha256Hex(value) {
   if (window.crypto?.subtle) {
-    const bytes = new TextEncoder().encode(password);
+    const bytes = new TextEncoder().encode(value);
     const digest = await window.crypto.subtle.digest("SHA-256", bytes);
     return Array.from(new Uint8Array(digest))
       .map((byte) => byte.toString(16).padStart(2, "0"))
       .join("");
   }
-  return fallbackHash(password);
+  return "";
+}
+
+async function hashPassword(password) {
+  const clean = String(password || "");
+  const sha = await sha256Hex(clean);
+  return sha || fallbackHash(clean);
+}
+
+// Verifica a senha aceitando tanto SHA-256 quanto fallbackHash e corrigindo letra maiúscula automática do celular
+async function verifyUserPassword(rawPassword, user) {
+  if (!user) return false;
+  const candidates = [String(rawPassword || "")];
+  const trimmed = candidates[0].trim();
+  if (trimmed && !candidates.includes(trimmed)) candidates.push(trimmed);
+  if (trimmed.length > 1) {
+    const lowerFirst = trimmed[0].toLowerCase() + trimmed.slice(1);
+    if (!candidates.includes(lowerFirst)) candidates.push(lowerFirst);
+  }
+
+  for (const candidate of candidates) {
+    const sha = await sha256Hex(candidate);
+    const fb = fallbackHash(candidate);
+    if (user.passwordHash === sha || user.passwordHash === fb || user.passwordHash === candidate) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function onlyDigits(value) {
+  return String(value || "").replace(/\D+/g, "");
+}
+
+// Adiciona o "olhinho" (Mostrar / Ocultar senha) em todos os campos de senha
+function enhancePasswordInputs(root = document) {
+  root.querySelectorAll('input[type="password"]').forEach((input) => {
+    if (input.dataset.eyeEnhanced === "true") return;
+    input.dataset.eyeEnhanced = "true";
+
+    const wrapper = document.createElement("div");
+    wrapper.className = "password-wrap";
+    input.parentNode.insertBefore(wrapper, input);
+    wrapper.appendChild(input);
+
+    const eyeBtn = document.createElement("button");
+    eyeBtn.type = "button";
+    eyeBtn.className = "password-toggle-btn";
+    eyeBtn.setAttribute("aria-label", "Mostrar ou ocultar senha");
+    eyeBtn.title = "Mostrar / Ocultar senha";
+    eyeBtn.textContent = "👁️";
+
+    eyeBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const isHidden = input.type === "password";
+      input.type = isHidden ? "text" : "password";
+      eyeBtn.textContent = isHidden ? "🙈" : "👁️";
+      input.focus();
+    });
+
+    wrapper.appendChild(eyeBtn);
+  });
 }
 
 function formatDateLocal(date = new Date()) {
@@ -577,11 +753,15 @@ function setAuthMessage(message, tone = "info") {
 }
 
 function showAuthMode(mode) {
+  const isLogin = mode === "login";
   const isRegister = mode === "register";
-  document.querySelector("#login-form")?.classList.toggle("active", !isRegister);
+  const isRecover = mode === "recover";
+  document.querySelector("#login-form")?.classList.toggle("active", isLogin);
   document.querySelector("#register-form")?.classList.toggle("active", isRegister);
-  document.querySelector("#show-login")?.classList.toggle("active", !isRegister);
+  document.querySelector("#recover-form")?.classList.toggle("active", isRecover);
+  document.querySelector("#show-login")?.classList.toggle("active", isLogin);
   document.querySelector("#show-register")?.classList.toggle("active", isRegister);
+  document.querySelector("#show-recover")?.classList.toggle("active", isRecover);
   setAuthMessage("");
 }
 
@@ -595,6 +775,667 @@ function logout() {
   currentUser = null;
   localStorage.removeItem(SESSION_KEY);
   window.location.href = "index.html";
+}
+
+
+// ============================================================================
+// TEMPLATES DAS PÁGINAS INTERNAS (Troca de aba instantânea sem desligar a Rádio)
+// ============================================================================
+
+const SCREEN_TEMPLATES = {
+  "dashboard.html": `
+    <section class="screen" id="dashboard" aria-labelledby="dashboard-title">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Resumo do mês</p>
+          <h2 id="dashboard-title">Dashboard</h2>
+        </div>
+        <div class="filter-row">
+          <a class="primary-button" href="nova-visita.html">Nova visita</a>
+        </div>
+      </div>
+      <div class="metric-grid compact">
+        <article class="metric-card">
+          <span>Visitas no mês</span>
+          <strong id="metric-month-visits">0</strong>
+          <small>Registros visíveis no seu escopo</small>
+        </article>
+        <article class="metric-card">
+          <span>Minhas visitas</span>
+          <strong id="metric-my-visits">0</strong>
+          <small id="metric-my-visits-label">Usuário logado</small>
+        </article>
+        <article class="metric-card">
+          <span>Igrejas com visitas</span>
+          <strong id="metric-active-churches">0</strong>
+          <small>Separação por ID interno</small>
+        </article>
+        <article class="metric-card">
+          <span>Visitas antes do Zaqueu</span>
+          <strong id="metric-zaqueu-visits">0</strong>
+          <small>Soma semanal dos núcleos ativos</small>
+        </article>
+      </div>
+      <section class="panel wide dashboard-chart-panel">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Comparativo</p>
+            <h3>Visitas por igreja e mês</h3>
+          </div>
+          <div class="chart-legend" aria-label="Legenda do gráfico">
+            <span><b class="legend-dot sede"></b>Igreja Sede</span>
+            <span><b class="legend-dot norte"></b>Igreja Campineiro</span>
+            <span><b class="legend-dot leste"></b>Igreja Mogi Guaçu</span>
+          </div>
+        </div>
+        <div class="comparison-chart-wrap">
+          <div class="comparison-chart" id="church-month-chart" aria-label="Comparativo mensal de visitas por igreja"></div>
+        </div>
+      </section>
+      <section class="panel wide">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Lista de visitas</p>
+            <h3>Registros mais recentes</h3>
+          </div>
+          <a class="text-button" href="visitas.html">Ver todas</a>
+        </div>
+        <div class="visit-list" id="dashboard-visits"></div>
+      </section>
+    </section>
+  `,
+
+  "perfil.html": `
+    <section class="screen" id="perfil" aria-labelledby="perfil-title">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Dados Pessoais e Credencial</p>
+          <h2 id="perfil-title">Meu Perfil</h2>
+        </div>
+        <span class="saving-state" id="profile-save-status">Protegido (Acesso restrito à Secretaria/ADM)</span>
+      </div>
+      <div class="zaqueu-layout">
+        <section class="panel wide">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Ficha de Membro</p>
+              <h3>Meus Dados Cadastrais</h3>
+            </div>
+          </div>
+          <form class="stack-form" id="profile-form" style="margin-top: 14px;">
+            <label class="upload-box" style="cursor: pointer; text-align: center;">
+              <span>📷 Toque aqui para escolher ou tirar sua Foto de Perfil</span>
+              <input id="profile-photo-input" type="file" accept="image/*" style="display: none;" />
+            </label>
+            <div class="form-grid">
+              <label>
+                Nome completo
+                <input id="prof-name" name="name" type="text" required />
+              </label>
+              <label>
+                Nº da Carteira de Membro
+                <input id="prof-member-card" name="memberCard" type="text" placeholder="Ex: SEDE-2026-001" />
+              </label>
+              <label>
+                CPF (Apenas ADM e Secretaria visualizam)
+                <input id="prof-cpf" name="cpf" type="text" placeholder="000.000.000-00" maxlength="14" />
+              </label>
+              <label>
+                Data de Aniversário / Nascimento
+                <input id="prof-birth" name="birthDate" type="date" />
+              </label>
+              <label>
+                Telefone / WhatsApp
+                <input id="prof-phone" name="phone" type="tel" placeholder="(19) 99999-9999" />
+              </label>
+              <label>
+                Data de Batismo / Membresia
+                <input id="prof-baptism" name="baptismDate" type="date" />
+              </label>
+            </div>
+            <label>
+              Endereço Completo (Rua, Nº, Bairro, Cidade - UF, CEP)
+              <textarea id="prof-address" name="address" rows="3" placeholder="Digite seu endereço residencial completo"></textarea>
+            </label>
+            <div class="form-actions">
+              <span id="profile-feedback" style="font-weight: 800; color: var(--green);"></span>
+              <button class="primary-button" type="submit">Salvar Meu Perfil</button>
+            </div>
+          </form>
+        </section>
+        <section class="panel" id="digital-member-card">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Credencial Digital</p>
+              <h3>Carteira de Membro</h3>
+            </div>
+          </div>
+          <div id="member-card-preview" style="margin-top: 14px;"></div>
+        </section>
+      </div>
+      <section class="panel wide" id="secretaria-members-panel" style="margin-top: 22px; display: none;">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Acesso Confidencial — Exclusivo ADM e Secretaria</p>
+            <h3>Fichas Cadastrais de Todos os Membros (<span id="secretaria-count">0</span>)</h3>
+          </div>
+          <label class="search">
+            <span aria-hidden="true">B</span>
+            <input id="secretaria-search" type="search" placeholder="Buscar por nome, CPF ou carteira..." />
+          </label>
+        </div>
+        <div class="visit-list" id="secretaria-members-list" style="margin-top: 14px;"></div>
+      </section>
+    </section>
+  `,
+
+  "visitas.html": `
+    <section class="screen" id="visitas" aria-labelledby="visitas-title">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Histórico de campo</p>
+          <h2 id="visitas-title">Visitas realizadas</h2>
+        </div>
+        <a class="primary-button" href="nova-visita.html">Nova visita</a>
+      </div>
+      <div class="toolbar">
+        <label class="search inline">
+          <span aria-hidden="true">B</span>
+          <input id="visit-search" type="search" placeholder="Nome do visitante ou visitado" />
+        </label>
+        <select id="church-filter" aria-label="Filtrar por igreja">
+          <option value="todos">Todas as igrejas</option>
+          <option value="sede">Igreja Sede</option>
+          <option value="campineiro">Igreja Campineiro</option>
+          <option value="mogi">Igreja Mogi Guaçu</option>
+        </select>
+        <select id="worker-filter" aria-label="Filtrar por obreiro">
+          <option value="todos">Todos os obreiros</option>
+        </select>
+        <select id="pastor-filter" aria-label="Filtrar por liderança pastoral">
+          <option value="todos">Todos os pastores/bispo</option>
+          <option value="bispo-wagner">Bispo Wagner</option>
+          <option value="pra-lindamir">Pastora Lindamir</option>
+          <option value="pr-paulo">Pastor Paulo</option>
+        </select>
+      </div>
+      <div class="visit-list" id="visit-results"></div>
+    </section>
+  `,
+
+  "nova-visita.html": `
+    <section class="screen" id="nova-visita" aria-labelledby="nova-visita-title">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Registro rápido</p>
+          <h2 id="nova-visita-title">Nova visita</h2>
+        </div>
+        <span class="saving-state" id="saving-state">Data selecionável</span>
+      </div>
+      <form class="visit-form" id="visit-form">
+        <input id="visit-worker-id" type="hidden" name="workerId" />
+        <input id="visit-church-id" type="hidden" name="churchId" />
+        <input id="visit-role-id" type="hidden" name="roleId" />
+        <div class="form-grid">
+          <label>
+            Data da visita
+            <input id="visit-date" name="date" type="date" required />
+          </label>
+          <label>
+            Visitante logado
+            <input id="visit-worker-name" name="worker" type="text" readonly />
+          </label>
+          <label>
+            Igreja vinculada
+            <input id="visit-church-name" name="church" type="text" readonly />
+          </label>
+          <label>
+            Pessoa/família visitada
+            <input name="visited" type="text" placeholder="Nome da pessoa ou família visitada" required />
+          </label>
+        </div>
+        <label>
+          Resumo da visita
+          <textarea name="summary" rows="7" placeholder="Escreva o essencial: quem foi visitado, como foi recebido, o que ficou combinado e qualquer observação pastoral importante." required></textarea>
+        </label>
+        <div class="form-actions">
+          <button class="secondary-button" type="reset">Limpar</button>
+          <button class="primary-button" type="submit">Salvar visita</button>
+        </div>
+      </form>
+    </section>
+  `,
+
+  "zaqueus.html": `
+    <section class="screen" id="zaqueus" aria-labelledby="zaqueus-title">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Núcleos abertos</p>
+          <h2 id="zaqueus-title">Zaqueus</h2>
+        </div>
+        <a class="primary-button zaqueu-leader-only" href="#novo-zaqueu">Criar Novo Zaqueu</a>
+      </div>
+      <div class="zaqueu-layout">
+        <section class="panel wide">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Controle semanal</p>
+              <h3>Zaqueus em andamento</h3>
+            </div>
+          </div>
+          <div class="zaqueu-list" id="zaqueu-list"></div>
+        </section>
+        <section class="panel zaqueu-leader-only" id="novo-zaqueu">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Abertura (Liderança+)</p>
+              <h3>Novo Zaqueu</h3>
+            </div>
+          </div>
+          <form class="stack-form" id="zaqueu-form">
+            <label>
+              Endereço completo
+              <textarea name="address" rows="3" placeholder="Rua, número, bairro, cidade" required></textarea>
+            </label>
+            <div class="form-grid one">
+              <label>
+                Data de início
+                <input id="zaqueu-start" name="start" type="date" required />
+              </label>
+              <label>
+                Data de término
+                <input id="zaqueu-end" name="end" type="date" readonly />
+              </label>
+            </div>
+            <label>
+              Anfitriões
+              <input name="hosts" type="text" placeholder="Nomes dos anfitriões" required />
+            </label>
+            <label>
+              Responsáveis
+              <input name="leaders" type="text" placeholder="Obreiros ou liderança responsável" required />
+            </label>
+            <label>
+              Pessoas iniciando sem responsáveis/anfitriões
+              <input name="initialPeople" type="number" min="0" value="0" />
+            </label>
+            <div class="form-grid one">
+              <label>
+                Dia da semana
+                <select name="weekday">
+                  <option>Domingo</option>
+                  <option>Segunda-feira</option>
+                  <option>Terça-feira</option>
+                  <option>Quarta-feira</option>
+                  <option>Quinta-feira</option>
+                  <option>Sexta-feira</option>
+                  <option>Sábado</option>
+                </select>
+              </label>
+              <label>
+                Horário
+                <input name="time" type="time" value="19:30" />
+              </label>
+            </div>
+            <button class="primary-button" type="submit">Criar Novo Zaqueu</button>
+          </form>
+        </section>
+      </div>
+      <section class="panel wide material-panel">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Material do Zaqueu</p>
+            <h3>Fotos e PDFs</h3>
+          </div>
+          <select id="zaqueu-material-filter" aria-label="Filtrar material do Zaqueu">
+            <option value="todos">Todos</option>
+            <option value="pdf">PDFs</option>
+            <option value="foto">Fotos</option>
+          </select>
+        </div>
+        <label class="upload-box">
+          <span>Subir arquivos do Zaqueu (até 1.5MB)</span>
+          <input id="zaqueu-files" type="file" multiple accept=".pdf,image/*" />
+        </label>
+        <div class="content-card-grid" id="zaqueu-materials"></div>
+      </section>
+    </section>
+  `,
+
+  "calendario.html": `
+    <section class="screen" id="calendario" aria-labelledby="calendario-title">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Agenda mensal</p>
+          <h2 id="calendario-title">Calendário Igreja</h2>
+        </div>
+        <div class="filter-row">
+          <label class="month-filter">
+            Mês
+            <input id="calendar-month" type="month" />
+          </label>
+        </div>
+      </div>
+      <div class="calendar-layout">
+        <section class="panel wide">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Secretaria sede</p>
+              <h3>Programação do mês</h3>
+            </div>
+            <span class="saving-state">Sincronizado</span>
+          </div>
+          <div class="calendar-board" id="calendar-board"></div>
+        </section>
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Eventos</p>
+              <h3>Lista do mês</h3>
+            </div>
+          </div>
+          <div class="calendar-event-list" id="calendar-event-list"></div>
+        </section>
+      </div>
+    </section>
+  `,
+
+  "biblioteca.html": `
+    <section class="screen" id="biblioteca" aria-labelledby="biblioteca-title">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Conteúdos para baixar</p>
+          <h2 id="biblioteca-title">Biblioteca</h2>
+        </div>
+      </div>
+      <section class="panel wide library-panel">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Disponíveis</p>
+            <h3>Devocionais e direcionamentos</h3>
+          </div>
+          <div class="segmented" role="group" aria-label="Categorias da biblioteca">
+            <button class="active" type="button" data-library-category="todos">Todos</button>
+            <button type="button" data-library-category="devocional">Devocionais</button>
+            <button type="button" data-library-category="direcionamento">Direcionamentos</button>
+            <button type="button" data-library-category="link">Links</button>
+          </div>
+        </div>
+        <div class="content-card-grid" id="library-grid"></div>
+      </section>
+    </section>
+  `,
+
+  "visao.html": `
+    <section class="screen" id="visao" aria-labelledby="visao-title">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Liderança</p>
+          <h2 id="visao-title">Visão Geral</h2>
+        </div>
+      </div>
+      <div class="metric-grid compact">
+        <article class="metric-card">
+          <span>Visitas realizadas</span>
+          <strong id="overview-visits">0</strong>
+          <small>Registros do mês no seu escopo</small>
+        </article>
+        <article class="metric-card">
+          <span>Visitas antes dos cultos</span>
+          <strong id="overview-zaqueu-visits">0</strong>
+          <small>Somente semana atual</small>
+        </article>
+        <article class="metric-card">
+          <span>Visitantes nos cultos</span>
+          <strong id="overview-cult-visitors">0</strong>
+          <small>Somados por semana</small>
+        </article>
+        <article class="metric-card">
+          <span>Frequentando semanalmente</span>
+          <strong id="overview-weekly-people">0</strong>
+          <small>Pessoas recorrentes nos Zaqueus</small>
+        </article>
+      </div>
+      <div class="leader-grid">
+        <section class="panel wide">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Zaqueu</p>
+              <h3>Frequência acumulada por semana</h3>
+            </div>
+          </div>
+          <div class="chart" id="zaqueu-week-chart" aria-label="Gráfico semanal de Zaqueus"></div>
+          <div class="chart-labels">
+            <span>Sem 1</span>
+            <span>Sem 2</span>
+            <span>Sem 3</span>
+            <span>Sem 4</span>
+            <span>Sem 5</span>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Separação por ID</p>
+              <h3>Igrejas e cargos</h3>
+            </div>
+          </div>
+          <div class="rank-list" id="overview-rank"></div>
+        </section>
+      </div>
+    </section>
+  `,
+
+  "notificacoes.html": `
+    <section class="screen" id="notificacoes" aria-labelledby="notificacoes-title">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Avisos Internos</p>
+          <h2 id="notificacoes-title">Notificações</h2>
+        </div>
+      </div>
+      <section class="panel wide">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Mural</p>
+            <h3>Notificações publicadas</h3>
+          </div>
+        </div>
+        <div class="notification-list" id="notification-list"></div>
+      </section>
+    </section>
+  `,
+};
+
+function toggleRadioPopup(openState) {
+  const widget = document.querySelector("#radio-popup-widget");
+  if (!widget) return;
+  const shouldOpen = typeof openState === "boolean" ? openState : !widget.classList.contains("is-open");
+  widget.classList.toggle("is-open", shouldOpen);
+  sessionStorage.setItem("appigreja_radio_popup_open", shouldOpen ? "true" : "false");
+  if (shouldOpen) {
+    renderRadioPage();
+  }
+}
+
+function injectRadioPopupWidget() {
+  if (!currentUser || document.querySelector("#radio-popup-widget")) return;
+
+  const widgetHtml = `
+    <aside class="radio-popup-widget" id="radio-popup-widget" aria-label="Popup da Rádio Ao Vivo">
+      <!-- Barra Flutuante Minimizável (Continua tocando ao trocar de aba) -->
+      <div class="radio-mini-bar" id="radio-mini-bar">
+        <span class="radio-mini-dot" id="popup-mini-dot"></span>
+        <div id="radio-mini-open-area" style="display:grid; min-width:0;">
+          <strong id="popup-mini-title" style="font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:190px;">📻 Rádio Ao Vivo</strong>
+          <small id="popup-mini-sub" style="font-size:11px; opacity:0.85;">Toque para abrir o player</small>
+        </div>
+        <button type="button" id="popup-mini-listen-btn" class="primary-button" style="background:#f3b743; color:#18342f; min-height:30px; padding:4px 10px; font-size:12px; font-weight:900;">
+          🔊 Ouvir
+        </button>
+        <button type="button" id="popup-mini-expand-btn" class="secondary-button" style="min-height:30px; padding:4px 8px; font-size:12px;">
+          ▲ Abrir
+        </button>
+      </div>
+
+      <!-- Janela Popup Completa da Rádio Ao Vivo -->
+      <section class="radio-popup-modal" id="radio-popup-modal">
+        <header style="display:flex; align-items:center; justify-content:space-between; gap:8px; border-bottom:1px solid var(--line); padding-bottom:10px;">
+          <div>
+            <span class="status-pill" id="popup-radio-status-badge">Offline</span>
+            <h3 style="margin:4px 0 0; font-size:17px;">📻 Rádio Ao Vivo (Popup)</h3>
+          </div>
+          <div style="display:flex; gap:6px; align-items:center;">
+            <button type="button" id="popup-detach-window-btn" class="secondary-button" style="min-height:30px; padding:4px 8px; font-size:11px;" title="Destacar em janela independente">
+              🗗 Janela
+            </button>
+            <button type="button" id="popup-minimize-btn" class="secondary-button" style="min-height:30px; padding:4px 10px; font-size:12px; font-weight:800;">
+              ㅡ Minimizar
+            </button>
+          </div>
+        </header>
+
+        <!-- Caixa do Player (Ouvintes) -->
+        <div style="padding:14px; border-radius:10px; background:linear-gradient(135deg, #18342f, #2f6f5e); color:#ffffff; display:grid; gap:10px;">
+          <div style="display:flex; align-items:center; gap:10px;">
+            <div id="popup-radio-live-indicator" style="width:14px; height:14px; border-radius:50%; background:#9ca3af; flex:0 0 14px;"></div>
+            <div style="min-width:0;">
+              <strong id="popup-radio-speaker-name" style="font-size:15px; display:block;">Ninguém ao vivo no momento</strong>
+              <span id="popup-radio-speaker-church" style="font-size:12px; opacity:0.85; display:block;">Você pode trocar de aba livremente que a rádio não desliga.</span>
+            </div>
+          </div>
+
+          <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+            <button class="primary-button" type="button" id="popup-listen-radio-btn" style="background:#f3b743; color:#18342f; font-weight:900; width:100%;">
+              🔊 Conectar Áudio para Ouvir
+            </button>
+            <small id="popup-listener-audio-status" style="font-size:12px; opacity:0.92;">Toque acima para ouvir enquanto navega pelo app.</small>
+          </div>
+
+          <audio id="popup-external-audio-player" controls style="width:100%; display:none;"></audio>
+        </div>
+
+        <!-- Estúdio de Transmissão (Visível para ADM ou quem tem permissão de Rádio) -->
+        <div id="popup-radio-broadcaster-studio" style="padding:12px; border:2px solid #9bc6bb; border-radius:10px; background:#f5fbf8; display:none;">
+          <p class="eyebrow" style="margin-bottom:6px;">🎙️ Estúdio do Locutor (Somente Entrada / Sem Eco)</p>
+          <div class="stack-form" style="gap:10px;">
+            <label style="font-size:12px;">
+              Título da Transmissão
+              <input id="popup-broadcast-title" type="text" value="Palavra Pastoral e Oração Ao Vivo" style="min-height:34px; padding:6px 8px;" />
+            </label>
+            <label style="font-size:12px;">
+              Link de Stream Externo (Opcional)
+              <input id="popup-broadcast-stream-url" type="url" placeholder="https://... (deixe vazio p/ usar Microfone)" style="min-height:34px; padding:6px 8px;" />
+            </label>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <button class="primary-button" type="button" id="popup-start-mic-btn" style="flex:1; min-height:36px; font-size:13px;">
+                🎙️ Entrar Ao Vivo
+              </button>
+              <button class="secondary-button danger-btn" type="button" id="popup-stop-broadcast-btn" style="display:none; flex:1; min-height:36px;">
+                ⏹️ Encerrar
+              </button>
+            </div>
+            <small id="popup-broadcaster-feedback" style="color:var(--green-dark); font-weight:700; font-size:12px;"></small>
+          </div>
+        </div>
+
+        <!-- Chat Ao Vivo e Pedidos de Oração dentro do Popup -->
+        <div style="display:grid; gap:8px; border-top:1px solid var(--line); padding-top:10px;">
+          <strong style="font-size:13px;">💬 Chat Ao Vivo & Pedidos de Oração</strong>
+          <form id="popup-radio-chat-form" style="display:flex; gap:6px;">
+            <input name="text" type="text" placeholder="Digite um Amém ou pedido..." required style="flex:1; min-height:36px; padding:6px 10px;" />
+            <button class="primary-button" type="submit" style="min-height:36px; padding:6px 12px;">Enviar</button>
+          </form>
+          <div id="popup-radio-chat-list" style="display:grid; gap:6px; max-height:190px; overflow-y:auto;"></div>
+        </div>
+      </section>
+    </aside>
+  `;
+
+  document.body.insertAdjacentHTML("beforeend", widgetHtml);
+
+  // Eventos do Popup da Rádio
+  document.querySelector("#radio-mini-open-area")?.addEventListener("click", () => toggleRadioPopup(true));
+  document.querySelector("#popup-mini-expand-btn")?.addEventListener("click", () => toggleRadioPopup(true));
+  document.querySelector("#popup-minimize-btn")?.addEventListener("click", () => toggleRadioPopup(false));
+
+  document.querySelector("#popup-mini-listen-btn")?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    startListeningRadioLoop();
+  });
+
+  document.querySelector("#popup-listen-radio-btn")?.addEventListener("click", startListeningRadioLoop);
+  document.querySelector("#popup-start-mic-btn")?.addEventListener("click", startMicrophoneBroadcast);
+  document.querySelector("#popup-stop-broadcast-btn")?.addEventListener("click", stopBroadcast);
+
+  document.querySelector("#popup-detach-window-btn")?.addEventListener("click", () => {
+    window.open("radio.html?popup=1", "AppIgrejaRadioPopup", "width=450,height=720,menubar=no,toolbar=no,location=no,status=no");
+  });
+
+  document.querySelector("#popup-radio-chat-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!currentUser) return;
+    const formEl = event.currentTarget;
+    const form = new FormData(formEl);
+    const text = String(form.get("text") || "").trim();
+    if (!text) return;
+    formEl.reset();
+    await sendRadioChatMessage(text);
+  });
+
+  if (sessionStorage.getItem("appigreja_radio_popup_open") === "true" || getCurrentPage() === "radio.html") {
+    toggleRadioPopup(true);
+  }
+}
+
+// Navegação Instantânea entre Abas (Sem recarregar a página e sem cortar o áudio/microfone da Rádio)
+function navigateToPageSeamless(rawHref, pushHistory = true) {
+  if (!rawHref) return;
+  const [filePart, hashOrQuery] = rawHref.split("#");
+  const [cleanPage, queryString] = filePart.split("?");
+  const targetPage = cleanPage || getCurrentPage();
+
+  if (targetPage === "index.html") {
+    logout();
+    return;
+  }
+
+  // Se clicar em Rádio Ao Vivo no menu lateral ou no banner, abre o Popup Flutuante da Rádio sem sair da aba atual!
+  if (targetPage === "radio.html") {
+    toggleRadioPopup(true);
+    return;
+  }
+
+  const allowedRoles = PAGE_PERMISSIONS[targetPage];
+  if (allowedRoles && !allowedRoles.includes(currentUser?.roleId)) {
+    return;
+  }
+
+  const template = SCREEN_TEMPLATES[targetPage];
+  const main = document.querySelector("#main-content") || document.querySelector(".main");
+  if (!template || !main) {
+    window.location.href = rawHref;
+    return;
+  }
+
+  activeVirtualPage = targetPage;
+
+  if (pushHistory && window.location.protocol.startsWith("http")) {
+    const newUrl = queryString ? `${targetPage}?${queryString}` : hashOrQuery ? `${targetPage}#${hashOrQuery}` : targetPage;
+    window.history.pushState({ page: targetPage }, "", newUrl);
+  }
+
+  main.innerHTML = template;
+  injectSharedShell();
+  wirePageContentEvents();
+  renderAll();
+
+  if (hashOrQuery) {
+    const targetEl = document.getElementById(hashOrQuery);
+    if (targetEl) targetEl.scrollIntoView({ behavior: "smooth" });
+  } else {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
 }
 
 function injectSharedShell() {
@@ -968,6 +1809,9 @@ function buildUserRoleCardHtml(u) {
           <input type="checkbox" class="user-radio-check" data-user-id="${escapeHtml(u.id)}" style="min-height: 18px; width: 18px;" ${u.canBroadcast ? "checked" : ""} />
           🎙️ Rádio
         </label>
+        <button class="secondary-button reset-user-pass-btn" type="button" data-user-id="${escapeHtml(u.id)}" style="padding: 6px 10px; min-height: 32px; font-size: 12px;" title="Redefinir senha ou enviar por WhatsApp">
+          🔑 Senha
+        </button>
         <button class="secondary-button danger-btn delete-user-btn" type="button" data-user-id="${escapeHtml(u.id)}">
           Excluir
         </button>
@@ -1038,6 +1882,41 @@ function wireUserRoleSelects(rootElement) {
         feedback.textContent = checkbox.checked
           ? `🎙️ ${targetUser.name} agora pode entrar Ao Vivo na Rádio!`
           : `Permissão de Rádio Ao Vivo removida de ${targetUser.name}.`;
+      }
+    });
+  });
+
+  rootElement.querySelectorAll(".reset-user-pass-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const userId = btn.dataset.userId;
+      const targetUser = appState.users.find((u) => u.id === userId);
+      if (!targetUser) return;
+      const newPass = prompt(
+        `Digite a NOVA SENHA para "${targetUser.name}" (${targetUser.login}):`,
+        "1234"
+      );
+      if (!newPass || newPass.trim().length < 4) {
+        if (newPass !== null) alert("A senha precisa ter pelo menos 4 caracteres.");
+        return;
+      }
+      const cleanPass = newPass.trim();
+      targetUser.passwordHash = await hashPassword(cleanPass);
+      await saveAppState();
+
+      const phoneDigits = onlyDigits(targetUser.phone);
+      const feedback = document.querySelector("#role-save-feedback");
+      if (feedback) {
+        feedback.textContent = `🔑 Senha de ${targetUser.name} alterada para "${cleanPass}"!`;
+      }
+      if (phoneDigits && confirm(`Senha alterada para "${cleanPass}"! Deseja abrir o WhatsApp de ${targetUser.name} para enviar a nova senha agora?`)) {
+        const waNum = phoneDigits.startsWith("55") ? phoneDigits : `55${phoneDigits}`;
+        const msg = `Olá *${targetUser.name}*! Seu acesso no *APPIGREJA* foi atualizado:
+
+📧 *E-mail:* ${targetUser.login}
+🔑 *Nova Senha:* ${cleanPass}`;
+        window.open(`https://wa.me/${waNum}?text=${encodeURIComponent(msg)}`, "_blank");
+      } else {
+        alert(`Senha de ${targetUser.name} alterada com sucesso para: ${cleanPass}`);
       }
     });
   });
@@ -1191,46 +2070,100 @@ function renderProfilePage() {
     : emptyCard("Nenhum membro encontrado para esta busca.");
 }
 
-// Renderização da Rádio Ao Vivo
+// Renderização da Rádio Ao Vivo (Sincroniza tanto a página quanto o Popup Flutuante)
 function renderRadioPage() {
-  const studio = document.querySelector("#radio-broadcaster-studio");
-  if (studio) {
-    studio.style.display = canBroadcastRadio() ? "block" : "none";
+  const live = appState.radioLive || { active: false };
+  const canBroadcast = canBroadcastRadio();
+
+  // Atualiza barra minimizada do Popup
+  const miniBar = document.querySelector("#radio-mini-bar");
+  const miniTitle = document.querySelector("#popup-mini-title");
+  const miniSub = document.querySelector("#popup-mini-sub");
+  const miniListenBtn = document.querySelector("#popup-mini-listen-btn");
+
+  if (miniBar) {
+    miniBar.classList.toggle("is-live", Boolean(live.active || isBroadcastingMic));
+  }
+  if (miniTitle) {
+    miniTitle.textContent = isBroadcastingMic
+      ? "🎙️ Você está Ao Vivo!"
+      : live.active
+        ? `🔴 ${live.title || "Rádio Ao Vivo"}`
+        : "📻 Rádio Ao Vivo";
+  }
+  if (miniSub) {
+    miniSub.textContent = isBroadcastingMic
+      ? "Microfone transmitindo em 2º plano"
+      : live.active
+        ? `No ar: ${live.speakerName}`
+        : isListeningRadio
+          ? "Sintonizado (aguardando locutor)"
+          : "Toque para abrir o popup";
+  }
+  if (miniListenBtn) {
+    if (isBroadcastingMic) {
+      miniListenBtn.textContent = "🔇 Locutor";
+      miniListenBtn.disabled = true;
+    } else {
+      miniListenBtn.disabled = false;
+      miniListenBtn.textContent = isListeningRadio ? "🔇 Mudo" : "🔊 Ouvir";
+    }
   }
 
-  const live = appState.radioLive || { active: false };
-  const badge = document.querySelector("#radio-status-badge");
-  const indicator = document.querySelector("#radio-live-indicator");
-  const titleEl = document.querySelector("#radio-current-title");
-  const speakerEl = document.querySelector("#radio-speaker-name");
-  const churchEl = document.querySelector("#radio-speaker-church");
-  const extPlayer = document.querySelector("#external-audio-player");
-  const stopBtn = document.querySelector("#stop-broadcast-btn");
+  // Atualiza estúdios (Página e Popup)
+  ["#radio-broadcaster-studio", "#popup-radio-broadcaster-studio"].forEach((sel) => {
+    const studio = document.querySelector(sel);
+    if (studio) studio.style.display = canBroadcast ? "block" : "none";
+  });
 
-  if (badge) {
+  // Atualiza badges de status
+  ["#radio-status-badge", "#popup-radio-status-badge"].forEach((sel) => {
+    const badge = document.querySelector(sel);
+    if (!badge) return;
     badge.textContent = live.active ? "🔴 AO VIVO AGORA" : "Offline no momento";
     badge.style.background = live.active ? "#fde8e8" : "#e8f0fb";
     badge.style.color = live.active ? "#b33a30" : "var(--blue)";
-  }
-  if (indicator) {
+  });
+
+  // Atualiza indicadores luminosos
+  ["#radio-live-indicator", "#popup-radio-live-indicator"].forEach((sel) => {
+    const indicator = document.querySelector(sel);
+    if (!indicator) return;
     indicator.style.background = live.active ? "#ef4444" : "#9ca3af";
     indicator.style.boxShadow = live.active ? "0 0 12px #ef4444" : "none";
-  }
+  });
+
+  const titleEl = document.querySelector("#radio-current-title");
   if (titleEl) {
     titleEl.textContent = live.active ? live.title || "Transmissão Ao Vivo" : "Aguardando início da transmissão";
   }
-  if (speakerEl) {
-    speakerEl.textContent = live.active ? `🎙️ No ar: ${live.speakerName}` : "Ninguém ao vivo no momento";
-  }
-  if (churchEl) {
-    churchEl.textContent = live.active
-      ? `${live.speakerChurch} — Transmissão ao vivo para todos os aparelhos`
-      : "Assim que o ADM ou líder autorizado entrar ao vivo, você ouvirá por aqui.";
-  }
-  if (stopBtn) {
-    stopBtn.style.display = live.active && canBroadcastRadio() ? "inline-flex" : "none";
-  }
-  if (extPlayer) {
+
+  ["#radio-speaker-name", "#popup-radio-speaker-name"].forEach((sel) => {
+    const speakerEl = document.querySelector(sel);
+    if (speakerEl) {
+      speakerEl.textContent = live.active ? `🎙️ No ar: ${live.speakerName}` : "Ninguém ao vivo no momento";
+    }
+  });
+
+  ["#radio-speaker-church", "#popup-radio-speaker-church"].forEach((sel) => {
+    const churchEl = document.querySelector(sel);
+    if (churchEl) {
+      churchEl.textContent = live.active
+        ? `${live.speakerChurch} — Continue navegando: o áudio não desliga!`
+        : "Você pode minimizar este popup e trocar de aba sem desligar a rádio.";
+    }
+  });
+
+  ["#stop-broadcast-btn", "#popup-stop-broadcast-btn"].forEach((sel) => {
+    const stopBtn = document.querySelector(sel);
+    if (stopBtn) {
+      stopBtn.style.display = (live.active || isBroadcastingMic) && canBroadcast ? "inline-flex" : "none";
+    }
+  });
+
+  ["#external-audio-player", "#popup-external-audio-player"].forEach((sel) => {
+    const extPlayer = document.querySelector(sel);
+    if (!extPlayer) return;
     if (live.active && live.streamUrl && !isBroadcastingMic) {
       extPlayer.style.display = "block";
       if (extPlayer.src !== live.streamUrl) {
@@ -1239,43 +2172,46 @@ function renderRadioPage() {
     } else {
       extPlayer.style.display = "none";
     }
-  }
+  });
 
-  const chatList = document.querySelector("#radio-chat-list");
-  if (chatList) {
-    const msgs = appState.radioMessages || [];
-    const canModerate = isAdmin() || canBroadcastRadio();
-    chatList.innerHTML = msgs.length
-      ? msgs
-          .slice(0, 40)
-          .map(
-            (m) => `
-          <div style="padding: 10px; border: 1px solid var(--line); border-radius: 6px; background: #fbfdfc;">
-            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:11px; color:var(--muted);">
-              <strong>${escapeHtml(m.author)} (${escapeHtml(m.church)})</strong>
-              <div style="display:flex; align-items:center; gap:6px;">
-                <span>${escapeHtml(m.time)}</span>
-                ${
-                  canModerate
-                    ? `<button type="button" class="delete-radio-msg-btn" data-msg-id="${escapeHtml(m.id)}" style="border:0; background:transparent; color:var(--red); font-weight:800; font-size:11px; padding:0 4px; cursor:pointer;" title="Apagar mensagem">✕</button>`
-                    : ""
-                }
-              </div>
+  // Renderiza o Chat Ao Vivo tanto na página quanto no Popup Flutuante
+  const msgs = appState.radioMessages || [];
+  const canModerate = isAdmin() || canBroadcast;
+  const chatHtml = msgs.length
+    ? msgs
+        .slice(0, 40)
+        .map(
+          (m) => `
+        <div style="padding: 9px 10px; border: 1px solid var(--line); border-radius: 6px; background: #fbfdfc;">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:11px; color:var(--muted);">
+            <strong>${escapeHtml(m.author)} (${escapeHtml(m.church)})</strong>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span>${escapeHtml(m.time)}</span>
+              ${
+                canModerate
+                  ? `<button type="button" class="delete-radio-msg-btn" data-msg-id="${escapeHtml(m.id)}" style="border:0; background:transparent; color:var(--red); font-weight:800; font-size:11px; padding:0 4px; cursor:pointer;" title="Apagar mensagem">✕</button>`
+                  : ""
+              }
             </div>
-            <p style="margin: 4px 0 0; font-size: 14px;">${escapeHtml(m.text)}</p>
           </div>
-        `
-          )
-          .join("")
-      : emptyCard("Nenhuma mensagem ainda. Seja o primeiro a enviar um Amém!");
+          <p style="margin: 4px 0 0; font-size: 13px;">${escapeHtml(m.text)}</p>
+        </div>
+      `
+        )
+        .join("")
+    : emptyCard("Nenhuma mensagem ainda. Seja o primeiro a enviar um Amém!");
 
+  ["#radio-chat-list", "#popup-radio-chat-list"].forEach((sel) => {
+    const chatList = document.querySelector(sel);
+    if (!chatList) return;
+    chatList.innerHTML = chatHtml;
     chatList.querySelectorAll(".delete-radio-msg-btn").forEach((btn) => {
       btn.addEventListener("click", async () => {
         const msgId = btn.dataset.msgId;
         await deleteRadioChatMessage(msgId);
       });
     });
-  }
+  });
 }
 
 let radioChatSyncInterval = null;
@@ -1324,7 +2260,7 @@ async function syncRadioChatAndStatus() {
       }
     }
 
-    if (shouldRender && getCurrentPage() === "radio.html") {
+    if (shouldRender) {
       renderRadioPage();
     }
   } catch (err) {
@@ -1415,16 +2351,40 @@ async function deleteRadioChatMessage(msgId) {
 function startRealtimeRadioSyncLoop() {
   if (radioChatSyncInterval) clearInterval(radioChatSyncInterval);
   syncRadioChatAndStatus();
-  const intervalMs = getCurrentPage() === "radio.html" ? 2000 : 6000;
-  radioChatSyncInterval = setInterval(syncRadioChatAndStatus, intervalMs);
+  radioChatSyncInterval = setInterval(syncRadioChatAndStatus, 2200);
 }
 
 // Transmissão Ao Vivo com trava Anti-Eco (Somente Entrada no aparelho locutor)
+function setRadioButtonsAndStatus(listenText, listenDisabled, statusText, feedbackText) {
+  ["#listen-radio-btn", "#popup-listen-radio-btn"].forEach((sel) => {
+    const btn = document.querySelector(sel);
+    if (!btn) return;
+    if (listenText !== null) btn.textContent = listenText;
+    if (typeof listenDisabled === "boolean") {
+      btn.disabled = listenDisabled;
+      btn.style.opacity = listenDisabled ? "0.5" : "1";
+    }
+  });
+  ["#listener-audio-status", "#popup-listener-audio-status"].forEach((sel) => {
+    const el = document.querySelector(sel);
+    if (el && statusText !== null) el.textContent = statusText;
+  });
+  ["#broadcaster-feedback", "#popup-broadcaster-feedback"].forEach((sel) => {
+    const el = document.querySelector(sel);
+    if (el && feedbackText !== null) el.textContent = feedbackText;
+  });
+}
+
 async function startMicrophoneBroadcast() {
   if (!canBroadcastRadio()) return;
-  const title = document.querySelector("#broadcast-title")?.value.trim() || "Palavra Pastoral Ao Vivo";
-  const streamUrl = document.querySelector("#broadcast-stream-url")?.value.trim() || "";
-  const feedback = document.querySelector("#broadcaster-feedback");
+  const title =
+    document.querySelector("#popup-broadcast-title")?.value.trim() ||
+    document.querySelector("#broadcast-title")?.value.trim() ||
+    "Palavra Pastoral Ao Vivo";
+  const streamUrl =
+    document.querySelector("#popup-broadcast-stream-url")?.value.trim() ||
+    document.querySelector("#broadcast-stream-url")?.value.trim() ||
+    "";
 
   // 1. Trava imediatamente qualquer saída de áudio neste aparelho (Modo Somente Entrada de Voz)
   isListeningRadio = false;
@@ -1439,16 +2399,12 @@ async function startMicrophoneBroadcast() {
     extPlayer.muted = true;
   }
 
-  const listenBtn = document.querySelector("#listen-radio-btn");
-  const statusEl = document.querySelector("#listener-audio-status");
-  if (listenBtn) {
-    listenBtn.disabled = true;
-    listenBtn.style.opacity = "0.5";
-    listenBtn.textContent = "🔇 Saída Mutada (Modo Locutor)";
-  }
-  if (statusEl) {
-    statusEl.textContent = "Somente entrada de voz ativa neste aparelho (saída desligada para evitar retorno/eco).";
-  }
+  setRadioButtonsAndStatus(
+    "🔇 Saída Mutada (Modo Locutor)",
+    true,
+    "Somente entrada de voz ativa neste aparelho (saída desligada para evitar retorno/eco).",
+    null
+  );
 
   appState.radioLive = {
     active: true,
@@ -1462,7 +2418,7 @@ async function startMicrophoneBroadcast() {
   renderRadioPage();
 
   if (streamUrl) {
-    if (feedback) feedback.textContent = "🔴 Rádio Ao Vivo iniciada com Link de Stream!";
+    setRadioButtonsAndStatus(null, null, null, "🔴 Rádio Ao Vivo iniciada com Link de Stream!");
     return;
   }
 
@@ -1477,9 +2433,7 @@ async function startMicrophoneBroadcast() {
       video: false,
     });
 
-    if (feedback) {
-      feedback.textContent = "🔴 MICROFONE NO AR (Somente Entrada)! Saída de som bloqueada neste aparelho para não dar eco.";
-    }
+    setRadioButtonsAndStatus(null, null, null, "🔴 MICROFONE NO AR (Somente Entrada)! Você pode minimizar o popup e navegar pelas abas.");
 
     const recordAndSendChunk = () => {
       if (!micStream || !isBroadcastingMic || !appState.radioLive?.active) return;
@@ -1523,9 +2477,7 @@ async function startMicrophoneBroadcast() {
     micRecorderInterval = setInterval(recordAndSendChunk, 2500);
   } catch (err) {
     isBroadcastingMic = false;
-    if (feedback) {
-      feedback.textContent = "Permissão de microfone negada no navegador. Libere o microfone no cadeado da barra de endereços!";
-    }
+    setRadioButtonsAndStatus(null, null, null, "Permissão de microfone negada no navegador. Libere o microfone no cadeado da barra de endereços!");
   }
 }
 
@@ -1556,36 +2508,28 @@ async function stopBroadcast() {
   };
   await saveAppState();
 
-  const listenBtn = document.querySelector("#listen-radio-btn");
-  const statusEl = document.querySelector("#listener-audio-status");
-  if (listenBtn) {
-    listenBtn.disabled = false;
-    listenBtn.style.opacity = "1";
-    listenBtn.textContent = "🔊 Conectar Áudio para Ouvir";
-  }
-  if (statusEl) {
-    statusEl.textContent = "Transmissão encerrada. Toque no botão amarelo se quiser ouvir outra pessoa.";
-  }
-
-  const feedback = document.querySelector("#broadcaster-feedback");
-  if (feedback) feedback.textContent = "⏹️ Transmissão encerrada e microfone desligado.";
+  setRadioButtonsAndStatus(
+    "🔊 Conectar Áudio para Ouvir",
+    false,
+    "Transmissão encerrada. Toque no botão amarelo se quiser ouvir outra pessoa.",
+    "⏹️ Transmissão encerrada e microfone desligado."
+  );
   renderRadioPage();
 }
 
 function startListeningRadioLoop() {
-  // Se este aparelho estiver transmitindo pelo microfone, bloqueia a saída de áudio
   if (isBroadcastingMic) {
-    const statusEl = document.querySelector("#listener-audio-status");
-    if (statusEl) {
-      statusEl.textContent = "🔇 Você está transmitindo neste aparelho! A saída de som fica desligada aqui para evitar retorno.";
-    }
+    setRadioButtonsAndStatus(
+      null,
+      null,
+      "🔇 Você está transmitindo neste aparelho! A saída de som fica desligada aqui para evitar retorno.",
+      null
+    );
     return;
   }
 
   isListeningRadio = !isListeningRadio;
-  const listenBtn = document.querySelector("#listen-radio-btn");
-  const statusEl = document.querySelector("#listener-audio-status");
-  const extPlayer = document.querySelector("#external-audio-player");
+  const extPlayer = document.querySelector("#popup-external-audio-player") || document.querySelector("#external-audio-player");
 
   if (!isListeningRadio) {
     if (currentPlayingAudio) {
@@ -1593,13 +2537,13 @@ function startListeningRadioLoop() {
       currentPlayingAudio = null;
     }
     if (extPlayer) extPlayer.pause();
-    if (listenBtn) listenBtn.textContent = "🔊 Conectar Áudio para Ouvir";
-    if (statusEl) statusEl.textContent = "🔇 Áudio silenciado neste aparelho.";
+    setRadioButtonsAndStatus("🔊 Conectar Áudio para Ouvir", false, "🔇 Áudio silenciado neste aparelho.", null);
+    renderRadioPage();
     return;
   }
 
-  if (listenBtn) listenBtn.textContent = "🔇 Silenciar Rádio neste Aparelho";
-  if (statusEl) statusEl.textContent = "✅ Sintonizado! Aguardando voz ao vivo...";
+  setRadioButtonsAndStatus("🔇 Silenciar Rádio neste Aparelho", false, "✅ Sintonizado! Você pode trocar de aba livremente.", null);
+  renderRadioPage();
 
   if (extPlayer && appState.radioLive?.streamUrl) {
     extPlayer.muted = false;
@@ -1617,7 +2561,6 @@ function startListeningRadioLoop() {
       if (!res.ok) return;
       const chunk = await res.json();
 
-      // Ignora se o pacote veio deste mesmo aparelho (DEVICE_INSTANCE_ID)
       if (!chunk || !chunk.id || chunk.deviceId === DEVICE_INSTANCE_ID) return;
 
       if (chunk.id !== lastPlayedChunkId && Date.now() - chunk.id < 15000) {
@@ -1628,7 +2571,7 @@ function startListeningRadioLoop() {
           }
           currentPlayingAudio = new Audio(chunk.audioUrl);
           currentPlayingAudio.play().catch(() => {});
-          if (statusEl) statusEl.textContent = `🔊 Ouvindo ao vivo: ${chunk.speaker || "Locutor"}`;
+          setRadioButtonsAndStatus(null, null, `🔊 Ouvindo ao vivo: ${chunk.speaker || "Locutor"}`, null);
         }
       }
     } catch {
@@ -2232,6 +3175,7 @@ function readFileAsDataUrl(file) {
 
 function renderAll() {
   applyChurchLogoEverywhere();
+  enhancePasswordInputs(document);
   renderUsersRoleManager();
   renderProfilePage();
   renderRadioPage();
@@ -2249,9 +3193,183 @@ function renderAll() {
   renderNotifications();
 }
 
+function injectAuthRecoveryUI() {
+  const authTabs = document.querySelector(".auth-tabs");
+  if (authTabs && !document.querySelector("#show-recover")) {
+    authTabs.style.gridTemplateColumns = "1fr 1fr 1fr";
+    authTabs.insertAdjacentHTML(
+      "beforeend",
+      `<button type="button" id="show-recover">Recuperar Senha</button>`
+    );
+  }
+
+  // Adiciona link "Esqueci minha senha" embaixo do campo de senha no Login
+  const loginForm = document.querySelector("#login-form");
+  if (loginForm && !document.querySelector("#forgot-pass-trigger")) {
+    const submitBtn = loginForm.querySelector('button[type="submit"]');
+    if (submitBtn) {
+      submitBtn.insertAdjacentHTML(
+        "beforebegin",
+        `<button type="button" class="forgot-link-btn" id="forgot-pass-trigger">🔑 Esqueci minha senha / Recuperar acesso</button>`
+      );
+    }
+  }
+
+  // Adiciona campo de WhatsApp no Cadastro inicial (se ainda não existir) para facilitar recuperação futura
+  const registerForm = document.querySelector("#register-form");
+  if (registerForm && !registerForm.querySelector('input[name="phone"]')) {
+    const loginLabel = registerForm.querySelector('input[name="login"]')?.closest("label");
+    if (loginLabel) {
+      loginLabel.insertAdjacentHTML(
+        "afterend",
+        `<label>
+          WhatsApp / Telefone (Para recuperar senha)
+          <input name="phone" type="tel" placeholder="(19) 99999-9999" autocomplete="tel" />
+        </label>`
+      );
+    }
+  }
+
+  // Injeta o formulário completo de Recuperação de Senha (por E-mail ou WhatsApp do perfil)
+  if (registerForm && !document.querySelector("#recover-form")) {
+    const recoverHtml = `
+      <form class="auth-form" id="recover-form">
+        <label>
+          Digite seu E-mail ou WhatsApp cadastrado no Perfil
+          <input id="recover-identifier" name="identifier" type="text" placeholder="seuemail@exemplo.com ou (19) 99999-9999" required />
+        </label>
+        <button class="secondary-button" type="submit" id="recover-search-btn">🔍 Localizar Meu Cadastro</button>
+
+        <div id="recover-result-area" style="display: none;"></div>
+      </form>
+    `;
+    registerForm.insertAdjacentHTML("afterend", recoverHtml);
+  }
+
+  enhancePasswordInputs(document);
+}
+
 function wireAuth() {
+  injectAuthRecoveryUI();
+
   document.querySelector("#show-login")?.addEventListener("click", () => showAuthMode("login"));
   document.querySelector("#show-register")?.addEventListener("click", () => showAuthMode("register"));
+  document.querySelector("#show-recover")?.addEventListener("click", () => showAuthMode("recover"));
+  document.querySelector("#forgot-pass-trigger")?.addEventListener("click", () => {
+    const currentEmail = document.querySelector('#login-form input[name="login"]')?.value || "";
+    showAuthMode("recover");
+    const recInput = document.querySelector("#recover-identifier");
+    if (recInput && currentEmail) {
+      recInput.value = currentEmail;
+    }
+  });
+
+  // Lógica de Recuperar Senha buscando do Perfil (E-mail ou WhatsApp)
+  let recoveredUser = null;
+  document.querySelector("#recover-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const rawQuery = String(document.querySelector("#recover-identifier")?.value || "").trim();
+    const resultArea = document.querySelector("#recover-result-area");
+    if (!rawQuery || !resultArea) return;
+
+    setAuthMessage("Buscando seu cadastro no banco de dados...", "info");
+    await syncFromCloud();
+
+    const cleanEmail = normalizeEmail(rawQuery);
+    const digits = onlyDigits(rawQuery);
+
+    recoveredUser = appState.users.find((u) => {
+      const matchEmail = normalizeEmail(u.loginKey || u.login) === cleanEmail;
+      const userPhoneDigits = onlyDigits(u.phone);
+      const matchPhone = digits.length >= 8 && userPhoneDigits.length >= 8 && (userPhoneDigits.endsWith(digits) || digits.endsWith(userPhoneDigits));
+      return matchEmail || matchPhone;
+    });
+
+    if (!recoveredUser) {
+      resultArea.style.display = "none";
+      setAuthMessage("Nenhum cadastro encontrado com esse E-mail ou WhatsApp.", "error");
+      return;
+    }
+
+    setAuthMessage("Cadastro localizado! Escolha abaixo como recuperar seu acesso:", "success");
+    const hasPhone = onlyDigits(recoveredUser.phone).length >= 8;
+
+    resultArea.style.display = "block";
+    resultArea.innerHTML = `
+      <div class="recovery-result-box">
+        <div>
+          <strong style="font-size: 16px; display: block;">👤 ${escapeHtml(recoveredUser.name)}</strong>
+          <small style="display: block; color: var(--muted);">E-mail: ${escapeHtml(recoveredUser.login)} | Igreja: ${escapeHtml(recoveredUser.church)}</small>
+          <small style="display: block; color: var(--teal); font-weight: 700;">WhatsApp no perfil: ${escapeHtml(recoveredUser.phone || "Não cadastrado no perfil")}</small>
+        </div>
+
+        <label style="font-size: 13px; color: var(--ink); font-weight: 800;">
+          Criar Nova Senha Agora (Toque no 👁️ para ver a senha)
+          <input id="recover-new-pass" type="password" minlength="4" placeholder="Digite sua nova senha (mín. 4 dígitos)" />
+        </label>
+
+        <button class="primary-button" type="button" id="recover-save-now-btn">
+          ✅ Salvar Nova Senha e Entrar Agora
+        </button>
+
+        <div style="border-top: 1px solid var(--line); padding-top: 10px; display: grid; gap: 8px;">
+          <small style="color: var(--muted); font-weight: 700;">Ou receba uma senha temporária pelos canais do seu perfil:</small>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            ${
+              hasPhone
+                ? `<button class="secondary-button" type="button" id="recover-send-whatsapp-btn" style="flex: 1; font-size: 12px;">📲 Receber via WhatsApp</button>`
+                : ""
+            }
+            <button class="secondary-button" type="button" id="recover-send-email-btn" style="flex: 1; font-size: 12px;">📧 Receber via E-mail</button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    enhancePasswordInputs(resultArea);
+
+    resultArea.querySelector("#recover-save-now-btn")?.addEventListener("click", async () => {
+      const newPass = String(resultArea.querySelector("#recover-new-pass")?.value || "").trim();
+      if (newPass.length < 4) {
+        setAuthMessage("Digite uma nova senha com pelo menos 4 caracteres.", "error");
+        return;
+      }
+      recoveredUser.passwordHash = await hashPassword(newPass);
+      await saveAppState();
+      setAuthMessage("Senha atualizada com sucesso! Entrando...", "success");
+      authenticateAs(recoveredUser);
+    });
+
+    resultArea.querySelector("#recover-send-whatsapp-btn")?.addEventListener("click", async () => {
+      const tempPass = String(Math.floor(100000 + Math.random() * 900000));
+      recoveredUser.passwordHash = await hashPassword(tempPass);
+      await saveAppState();
+      const phoneDigits = onlyDigits(recoveredUser.phone);
+      const waNum = phoneDigits.startsWith("55") ? phoneDigits : `55${phoneDigits}`;
+      const text = `Olá *${recoveredUser.name}*! Aqui está sua senha de recuperação do *APPIGREJA*:
+
+📧 *E-mail:* ${recoveredUser.login}
+🔑 *Senha Temporária:* ${tempPass}`;
+      window.open(`https://wa.me/${waNum}?text=${encodeURIComponent(text)}`, "_blank");
+      setAuthMessage(`Senha temporária (${tempPass}) gerada e enviada para o seu WhatsApp!`, "success");
+    });
+
+    resultArea.querySelector("#recover-send-email-btn")?.addEventListener("click", async () => {
+      const tempPass = String(Math.floor(100000 + Math.random() * 900000));
+      recoveredUser.passwordHash = await hashPassword(tempPass);
+      await saveAppState();
+      const subject = "Recuperação de Senha - APPIGREJA";
+      const body = `Olá ${recoveredUser.name},
+
+Seus dados de acesso ao APPIGREJA foram atualizados:
+E-mail: ${recoveredUser.login}
+Nova Senha Temporária: ${tempPass}
+
+Você pode alterar essa senha a qualquer momento no aplicativo.`;
+      window.location.href = `mailto:${recoveredUser.login}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      setAuthMessage(`Senha temporária (${tempPass}) gerada! Verifique seu aplicativo de e-mail.`, "success");
+    });
+  });
 
   document.querySelector("#register-form")?.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -2276,13 +3394,14 @@ function wireAuth() {
     const church = CHURCHES[churchId] || CHURCHES.sede;
     const hasAnyAdmin = appState.users.some((u) => u.roleId === "adm");
     const roleId = form.get("roleId") || (hasAnyAdmin ? "obreiro" : "adm");
+    const rawPass = String(form.get("password") || "").trim();
 
     const user = {
       id: `user_${Date.now()}`,
       name: String(form.get("name")).trim(),
       login: rawEmail.toLowerCase(),
       loginKey,
-      passwordHash: await hashPassword(String(form.get("password"))),
+      passwordHash: await hashPassword(rawPass),
       roleId,
       role: ROLE_LABELS[roleId] || "Obreiro",
       subRoleId: "nenhum",
@@ -2296,7 +3415,7 @@ function wireAuth() {
       photoUrl: "",
       cpf: "",
       birthDate: "",
-      phone: "",
+      phone: String(form.get("phone") || "").trim(),
       baptismDate: "",
       address: "",
       createdAt: new Date().toISOString(),
@@ -2315,23 +3434,67 @@ function wireAuth() {
 
     await syncFromCloud();
 
-    const loginKey = normalizeEmail(form.get("login"));
-    const user = appState.users.find((item) => normalizeEmail(item.loginKey || item.login) === loginKey);
+    const rawLogin = String(form.get("login") || "").trim();
+    const loginKey = normalizeEmail(rawLogin);
+    const loginDigits = onlyDigits(rawLogin);
+
+    const user = appState.users.find((item) => {
+      const emailMatch = normalizeEmail(item.loginKey || item.login) === loginKey;
+      const phoneDigits = onlyDigits(item.phone);
+      const phoneMatch = loginDigits.length >= 8 && phoneDigits.length >= 8 && (phoneDigits.endsWith(loginDigits) || loginDigits.endsWith(phoneDigits));
+      return emailMatch || phoneMatch;
+    });
+
     if (!user) {
-      setAuthMessage("E-mail não encontrado no sistema.", "error");
+      setAuthMessage("E-mail não encontrado no sistema. Confira a digitação ou use Recuperar Senha.", "error");
       return;
     }
-    const passwordHash = await hashPassword(String(form.get("password")));
-    if (passwordHash !== user.passwordHash) {
-      setAuthMessage("Senha inválida para este e-mail.", "error");
+
+    const rawPassword = String(form.get("password") || "");
+    const isPasswordValid = await verifyUserPassword(rawPassword, user);
+    if (!isPasswordValid) {
+      setAuthMessage("Senha incorreta. Toque no 👁️ para conferir o que digitou ou clique em 'Esqueci minha senha'.", "error");
       return;
     }
+
+    // Atualiza o hash para o padrão SHA-256 caso estivesse em formato antigo
+    user.passwordHash = await hashPassword(rawPassword.trim() || rawPassword);
+    await saveAppState();
+
     formElement.reset();
     authenticateAs(user);
   });
 }
 
-function wireEvents() {
+let globalNavWired = false;
+
+function wireSeamlessLinkInterception() {
+  if (globalNavWired) return;
+  globalNavWired = true;
+
+  document.addEventListener("click", (event) => {
+    const link = event.target.closest("a[href]");
+    if (!link) return;
+    const href = link.getAttribute("href") || "";
+    if (!href || href.startsWith("http") || href.startsWith("mailto:") || href.startsWith("tel:") || href.startsWith("data:") || link.hasAttribute("download")) {
+      return;
+    }
+    if (href.startsWith("#")) return;
+    if (href.includes(".html")) {
+      event.preventDefault();
+      navigateToPageSeamless(href, true);
+    }
+  });
+
+  window.addEventListener("popstate", () => {
+    const pathPage = decodeURIComponent(window.location.pathname.split("/").pop() || "");
+    if (pathPage && pathPage.endsWith(".html") && pathPage !== "index.html") {
+      navigateToPageSeamless(pathPage, false);
+    }
+  });
+}
+
+function wirePageContentEvents() {
   document.querySelector("#logout-button")?.addEventListener("click", logout);
   document.querySelector("#reset-db-btn")?.addEventListener("click", resetEntireDatabase);
 
@@ -2466,7 +3629,7 @@ function wireEvents() {
   const globalSearch = document.querySelector("#global-search");
   globalSearch?.addEventListener("keydown", (event) => {
     if (event.key === "Enter" && getCurrentPage() !== "visitas.html") {
-      window.location.href = `visitas.html?q=${encodeURIComponent(globalSearch.value.trim())}`;
+      navigateToPageSeamless(`visitas.html?q=${encodeURIComponent(globalSearch.value.trim())}`);
     }
   });
 
@@ -2493,7 +3656,7 @@ function wireEvents() {
       createdAt: new Date().toISOString(),
     });
     await saveAppState();
-    window.location.href = getHomePageForUser(currentUser);
+    navigateToPageSeamless(getHomePageForUser(currentUser));
   });
 
   document.querySelector("#zaqueu-start")?.addEventListener("input", updateZaqueuEndDate);
@@ -2678,7 +3841,9 @@ async function initApp() {
   document.body.classList.toggle("can-manage-zaqueu", canManageZaqueu());
 
   injectSharedShell();
-  wireEvents();
+  injectRadioPopupWidget();
+  wireSeamlessLinkInterception();
+  wirePageContentEvents();
   renderAll();
 
   await syncFromCloud();
