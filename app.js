@@ -1,6 +1,7 @@
 const STORAGE_KEY = "appigreja_prototype_state_v1";
 const SESSION_KEY = "appigreja_prototype_session_v1";
 const CLOUD_INIT_KEY = "appigreja_cloud_initialized_v1";
+const SEEN_ALERTS_KEY = "appigreja_seen_alerts_v1";
 
 // LINK DO SEU FIREBASE REALTIME DATABASE JÁ CONFIGURADO:
 const CLOUD_DB_URL = "https://appigreja-1f504-default-rtdb.firebaseio.com";
@@ -489,6 +490,33 @@ function injectCriticalFixesCss() {
       display: grid;
       gap: 12px;
     }
+    .app-toast-container {
+      position: fixed;
+      top: 18px;
+      right: 18px;
+      z-index: 10000;
+      display: grid;
+      gap: 10px;
+      width: min(380px, calc(100vw - 28px));
+      pointer-events: none;
+    }
+    .app-toast-card {
+      pointer-events: auto;
+      padding: 14px 16px;
+      border-radius: 12px;
+      background: #18342f;
+      color: #ffffff;
+      border-left: 5px solid #f3b743;
+      box-shadow: 0 18px 42px rgba(0, 0, 0, 0.32);
+      display: grid;
+      gap: 6px;
+      cursor: pointer;
+      animation: toastSlideIn 0.25s ease-out;
+    }
+    @keyframes toastSlideIn {
+      from { transform: translateY(-16px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
     @media (max-width: 980px) {
       .user-role-row {
         grid-template-columns: 1fr;
@@ -776,7 +804,6 @@ function logout() {
   localStorage.removeItem(SESSION_KEY);
   window.location.href = "index.html";
 }
-
 
 // ============================================================================
 // TEMPLATES DAS PÁGINAS INTERNAS (Troca de aba instantânea sem desligar a Rádio)
@@ -1438,6 +1465,278 @@ function navigateToPageSeamless(rawHref, pushHistory = true) {
   }
 }
 
+// ============================================================================
+// SISTEMA DE NOTIFICAÇÕES NATIVAS (CELULAR ANDROID E ÁREA DE TRABALHO PC)
+// ============================================================================
+let swRegistration = null;
+let backgroundSyncWorker = null;
+
+async function registerAppServiceWorker() {
+  if (!("serviceWorker" in navigator)) return null;
+  try {
+    swRegistration = await navigator.serviceWorker.register("sw.js");
+    navigator.serviceWorker.addEventListener("message", (event) => {
+      const data = event.data || {};
+      if (data.type === "NOTIFICATION_CLICK_NAVIGATE" && data.url) {
+        const cleanTarget = String(data.url).replace("./", "");
+        navigateToPageSeamless(cleanTarget, true);
+      }
+    });
+    return swRegistration;
+  } catch (err) {
+    console.warn("Service Worker em modo local:", err);
+    return null;
+  }
+}
+
+function playNotificationChime() {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const now = ctx.currentTime;
+
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    osc1.type = "sine";
+    osc1.frequency.setValueAtTime(587.33, now); // D5
+    osc1.frequency.setValueAtTime(880, now + 0.14); // A5
+    gain1.gain.setValueAtTime(0.12, now);
+    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+
+    osc1.connect(gain1);
+    gain1.connect(ctx.destination);
+    osc1.start(now);
+    osc1.stop(now + 0.45);
+  } catch {
+    // Ignora se o navegador bloquear áudio antes do 1º toque
+  }
+}
+
+function showInAppToast({ title, body, url }) {
+  let container = document.querySelector("#app-toast-container");
+  if (!container) {
+    container = document.createElement("div");
+    container.id = "app-toast-container";
+    container.className = "app-toast-container";
+    document.body.appendChild(container);
+  }
+
+  const card = document.createElement("div");
+  card.className = "app-toast-card";
+  card.innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+      <strong style="font-size:14px; color:#f3b743;">${escapeHtml(title)}</strong>
+      <span style="font-size:11px; opacity:0.75;">Agora</span>
+    </div>
+    <p style="margin:0; font-size:13px; color:#eef4f1;">${escapeHtml(body)}</p>
+  `;
+
+  card.addEventListener("click", () => {
+    card.remove();
+    if (url) {
+      navigateToPageSeamless(String(url).replace("./", ""), true);
+    }
+  });
+
+  container.appendChild(card);
+  setTimeout(() => {
+    card.remove();
+  }, 7000);
+}
+
+async function triggerSystemNotification({ title, body, tag, url = "./dashboard.html", requireInteraction = false }) {
+  playNotificationChime();
+  showInAppToast({ title, body, url });
+
+  if (!("Notification" in window) || Notification.permission !== "granted") {
+    return;
+  }
+
+  const iconUrl = appState.churchLogo || "logo.png";
+  const options = {
+    body,
+    icon: iconUrl,
+    badge: iconUrl,
+    tag: tag || `appigreja_${Date.now()}`,
+    renotify: true,
+    requireInteraction,
+    vibrate: [250, 120, 250, 120, 300],
+    data: { url },
+  };
+
+  try {
+    if (swRegistration && swRegistration.showNotification) {
+      await swRegistration.showNotification(title, options);
+      return;
+    }
+    if ("serviceWorker" in navigator) {
+      const reg = await navigator.serviceWorker.ready;
+      if (reg && reg.showNotification) {
+        await reg.showNotification(title, options);
+        return;
+      }
+    }
+  } catch {
+    // Fallback para Notification da área de trabalho
+  }
+
+  try {
+    const nativeNotif = new Notification(title, options);
+    nativeNotif.onclick = () => {
+      window.focus();
+      nativeNotif.close();
+      if (url) navigateToPageSeamless(String(url).replace("./", ""), true);
+    };
+  } catch (err) {
+    console.warn("Erro ao exibir notificação nativa:", err);
+  }
+}
+
+async function requestPushNotificationPermission(sendTest = true) {
+  if (!("Notification" in window)) {
+    alert("Este navegador não suporta notificações nativas do sistema.");
+    return false;
+  }
+
+  let permission = Notification.permission;
+  if (permission !== "granted") {
+    permission = await Notification.requestPermission();
+  }
+
+  updatePushPermissionButtonUI();
+
+  if (permission === "granted") {
+    if (sendTest) {
+      await triggerSystemNotification({
+        title: "🔔 Alertas do APPIGREJA Ativados!",
+        body: "Você receberá avisos de Novos Eventos, Notificações e Rádio Ao Vivo no celular e computador.",
+        tag: "appigreja_test_alert",
+        url: "./notificacoes.html",
+      });
+    }
+    return true;
+  } else {
+    alert("Permissão de notificação negada. Para receber alertas no celular/PC, libere as notificações no ícone de cadeado da barra de endereços.");
+    return false;
+  }
+}
+
+function updatePushPermissionButtonUI() {
+  const btn = document.querySelector("#push-permission-btn");
+  if (!btn) return;
+  const granted = "Notification" in window && Notification.permission === "granted";
+  if (granted) {
+    btn.textContent = "🔔 Alertas Ativos";
+    btn.style.background = "#e4f3ef";
+    btn.style.color = "var(--green-dark)";
+    btn.style.borderColor = "#9bc6bb";
+  } else {
+    btn.textContent = "🔔 Ativar Alertas";
+    btn.style.background = "#fff3d9";
+    btn.style.color = "#7b570f";
+    btn.style.borderColor = "#f3b743";
+  }
+}
+
+function loadSeenAlerts() {
+  try {
+    const raw = localStorage.getItem(SEEN_ALERTS_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function saveSeenAlerts(seenObj) {
+  localStorage.setItem(SEEN_ALERTS_KEY, JSON.stringify(seenObj));
+}
+
+// Marca os itens atuais como vistos no 1º carregamento ou quando o próprio usuário cria um item
+function markCurrentItemsAsSeen() {
+  const existing = loadSeenAlerts() || { initialized: true, notifIds: [], calIds: [], lastRadioLiveAt: 0 };
+  const notifIds = new Set([...(existing.notifIds || []), ...(appState.notifications || []).map((n) => n.id)]);
+  const calIds = new Set([...(existing.calIds || []), ...(appState.calendarEvents || []).map((c) => c.id)]);
+  const liveAt = Math.max(Number(existing.lastRadioLiveAt || 0), Number(appState.radioLive?.updatedAt || 0));
+
+  saveSeenAlerts({
+    initialized: true,
+    notifIds: Array.from(notifIds).slice(-200),
+    calIds: Array.from(calIds).slice(-200),
+    lastRadioLiveAt: liveAt,
+  });
+}
+
+async function checkAndDispatchNewCloudAlerts(remoteState) {
+  if (!remoteState || typeof remoteState !== "object") return;
+
+  const seen = loadSeenAlerts();
+  if (!seen || !seen.initialized) {
+    markCurrentItemsAsSeen();
+    return;
+  }
+
+  let changedSeen = false;
+  const notifSet = new Set(seen.notifIds || []);
+  const calSet = new Set(seen.calIds || []);
+  let lastLiveAt = Number(seen.lastRadioLiveAt || 0);
+
+  // 1. Verifica se alguém entrou AO VIVO na Rádio
+  const remoteLive = remoteState.radioLive;
+  if (remoteLive && remoteLive.active && Number(remoteLive.updatedAt || 0) > lastLiveAt) {
+    lastLiveAt = Number(remoteLive.updatedAt);
+    changedSeen = true;
+    await triggerSystemNotification({
+      title: `🔴 RÁDIO AO VIVO: ${remoteLive.title || "Transmissão Iniciada"}`,
+      body: `🎙️ ${remoteLive.speakerName || "Locutor"} entrou ao vivo agora (${remoteLive.speakerChurch || "APPIGREJA"}). Toque para ouvir!`,
+      tag: `radio_live_${lastLiveAt}`,
+      url: "./radio.html",
+      requireInteraction: true,
+    });
+  }
+
+  // 2. Verifica se alguém criou uma NOVA NOTIFICAÇÃO
+  const remoteNotifs = Array.isArray(remoteState.notifications) ? remoteState.notifications : [];
+  for (const n of remoteNotifs) {
+    if (n && n.id && !notifSet.has(n.id)) {
+      notifSet.add(n.id);
+      changedSeen = true;
+      await triggerSystemNotification({
+        title: `🔔 ${n.title || "Nova Notificação"}`,
+        body: `${n.message || "Novo comunicado publicado no aplicativo."}`,
+        tag: `notif_${n.id}`,
+        url: "./notificacoes.html",
+      });
+    }
+  }
+
+  // 3. Verifica se alguém cadastrou um NOVO EVENTO NO CALENDÁRIO
+  const remoteCals = Array.isArray(remoteState.calendarEvents) ? remoteState.calendarEvents : [];
+  for (const ev of remoteCals) {
+    if (ev && ev.id && !calSet.has(ev.id)) {
+      calSet.add(ev.id);
+      changedSeen = true;
+      const timeStr = ev.time ? ` às ${ev.time}` : "";
+      await triggerSystemNotification({
+        title: `📅 Novo Evento: ${ev.title || "Agenda da Igreja"}`,
+        body: `${formatDate(ev.date)}${timeStr} — ${ev.church || "Igreja Sede"}. ${ev.description || ""}`.trim(),
+        tag: `cal_${ev.id}`,
+        url: "./calendario.html",
+      });
+    }
+  }
+
+  if (changedSeen) {
+    saveSeenAlerts({
+      initialized: true,
+      notifIds: Array.from(notifSet).slice(-200),
+      calIds: Array.from(calSet).slice(-200),
+      lastRadioLiveAt: lastLiveAt,
+    });
+  }
+}
+
 function injectSharedShell() {
   const shell = document.querySelector("#app-shell") || document.querySelector(".app-shell");
   const main = document.querySelector("#main-content") || document.querySelector(".main");
@@ -1515,6 +1814,7 @@ function injectSharedShell() {
         <h1 id="screen-title">${escapeHtml(pageTitle)}</h1>
       </div>
       <div class="topbar-actions">
+        <button class="secondary-button" type="button" id="push-permission-btn" title="Ativar ou testar notificações no celular e área de trabalho">🔔 Ativar Alertas</button>
         ${promoteSelfBtn}
         <a class="secondary-button" href="perfil.html">Meu Perfil</a>
         <a class="ghost-button" href="nova-visita.html">Nova visita</a>
@@ -2217,19 +2517,23 @@ function renderRadioPage() {
 let radioChatSyncInterval = null;
 let lastRenderedChatSignature = "";
 let lastRenderedLiveSignature = "";
+let lastRenderedNotifSignature = "";
+let lastRenderedCalSignature = "";
 
 async function syncRadioChatAndStatus() {
   const chatEndpoint = getCloudEndpoint("appigreja_radio_chat");
-  const liveEndpoint = getCloudEndpoint("appigreja_state/radioLive");
-  if (!chatEndpoint) return;
+  const stateEndpoint = getCloudEndpoint("appigreja_state");
+  if (!chatEndpoint || !stateEndpoint) return;
 
   try {
-    const [chatRes, liveRes] = await Promise.all([
+    const [chatRes, stateRes] = await Promise.all([
       fetch(chatEndpoint, { cache: "no-store" }),
-      fetch(liveEndpoint, { cache: "no-store" }),
+      fetch(stateEndpoint, { cache: "no-store" }),
     ]);
 
-    let shouldRender = false;
+    let shouldRenderRadio = false;
+    let shouldRenderNotifs = false;
+    let shouldRenderCalendar = false;
 
     if (chatRes.ok) {
       const remoteMsgs = await chatRes.json();
@@ -2243,26 +2547,46 @@ async function syncRadioChatAndStatus() {
         lastRenderedChatSignature = sig;
         appState.radioMessages = normalizedMsgs;
         localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
-        shouldRender = true;
+        shouldRenderRadio = true;
       }
     }
 
-    if (liveRes.ok) {
-      const remoteLive = await liveRes.json();
-      if (remoteLive && typeof remoteLive === "object") {
-        const liveSig = JSON.stringify(remoteLive);
+    if (stateRes.ok) {
+      const cloudState = await stateRes.json();
+      if (cloudState && typeof cloudState === "object") {
+        const normalizedCloud = normalizeStateData(cloudState);
+
+        // Dispara notificações nativas no Celular / Área de Trabalho se houver novo Evento, Notificação ou Rádio Ao Vivo!
+        await checkAndDispatchNewCloudAlerts(normalizedCloud);
+
+        const liveSig = JSON.stringify(normalizedCloud.radioLive);
         if (liveSig !== lastRenderedLiveSignature) {
           lastRenderedLiveSignature = liveSig;
-          appState.radioLive = { ...appState.radioLive, ...remoteLive };
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
-          shouldRender = true;
+          appState.radioLive = normalizedCloud.radioLive;
+          shouldRenderRadio = true;
         }
+
+        const notifSig = JSON.stringify(normalizedCloud.notifications);
+        if (notifSig !== lastRenderedNotifSignature) {
+          lastRenderedNotifSignature = notifSig;
+          appState.notifications = normalizedCloud.notifications;
+          shouldRenderNotifs = true;
+        }
+
+        const calSig = JSON.stringify(normalizedCloud.calendarEvents);
+        if (calSig !== lastRenderedCalSignature) {
+          lastRenderedCalSignature = calSig;
+          appState.calendarEvents = normalizedCloud.calendarEvents;
+          shouldRenderCalendar = true;
+        }
+
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
       }
     }
 
-    if (shouldRender) {
-      renderRadioPage();
-    }
+    if (shouldRenderRadio) renderRadioPage();
+    if (shouldRenderNotifs) renderNotifications();
+    if (shouldRenderCalendar) renderCalendar();
   } catch (err) {
     // Ignora oscilações momentâneas de rede
   }
@@ -2349,9 +2673,30 @@ async function deleteRadioChatMessage(msgId) {
 }
 
 function startRealtimeRadioSyncLoop() {
-  if (radioChatSyncInterval) clearInterval(radioChatSyncInterval);
+  markCurrentItemsAsSeen();
   syncRadioChatAndStatus();
-  radioChatSyncInterval = setInterval(syncRadioChatAndStatus, 2200);
+
+  // Usa um Web Worker em 2º plano para o timer não congelar quando o usuário minimizar o app ou trocar de janela
+  if (!backgroundSyncWorker && typeof Worker !== "undefined" && typeof Blob !== "undefined") {
+    try {
+      const workerBlob = new Blob(
+        [
+          `setInterval(() => { postMessage("tick"); }, 3000);`
+        ],
+        { type: "application/javascript" }
+      );
+      backgroundSyncWorker = new Worker(URL.createObjectURL(workerBlob));
+      backgroundSyncWorker.onmessage = () => {
+        syncRadioChatAndStatus();
+      };
+      return;
+    } catch {
+      // Fallback para setInterval padrão
+    }
+  }
+
+  if (radioChatSyncInterval) clearInterval(radioChatSyncInterval);
+  radioChatSyncInterval = setInterval(syncRadioChatAndStatus, 3000);
 }
 
 // Transmissão Ao Vivo com trava Anti-Eco (Somente Entrada no aparelho locutor)
@@ -2414,6 +2759,7 @@ async function startMicrophoneBroadcast() {
     streamUrl,
     updatedAt: Date.now(),
   };
+  markCurrentItemsAsSeen();
   await saveAppState();
   renderRadioPage();
 
@@ -3496,6 +3842,10 @@ function wireSeamlessLinkInterception() {
 
 function wirePageContentEvents() {
   document.querySelector("#logout-button")?.addEventListener("click", logout);
+  document.querySelector("#push-permission-btn")?.addEventListener("click", () => {
+    requestPushNotificationPermission(true);
+  });
+  updatePushPermissionButtonUI();
   document.querySelector("#reset-db-btn")?.addEventListener("click", resetEntireDatabase);
 
   // Upload da Logo da Igreja pelo ADM
@@ -3767,11 +4117,18 @@ function wirePageContentEvents() {
       createdBy: currentUser.id,
       createdAt: new Date().toISOString(),
     });
+    markCurrentItemsAsSeen();
     await saveAppState();
     formElement.reset();
     const fb = document.querySelector("#notif-feedback");
-    if (fb) fb.textContent = "Notificação publicada para todos!";
+    if (fb) fb.textContent = "Notificação publicada e enviada para todos os aparelhos!";
     renderNotifications();
+    await triggerSystemNotification({
+      title: `🔔 ${appState.notifications[0]?.title || "Nova Notificação"}`,
+      body: appState.notifications[0]?.message || "",
+      tag: `notif_${appState.notifications[0]?.id}`,
+      url: "./notificacoes.html",
+    });
   });
 
   document.querySelector("#calendar-form")?.addEventListener("submit", async (event) => {
@@ -3789,6 +4146,8 @@ function wirePageContentEvents() {
       description: form.get("description"),
       createdBy: currentUser.id,
     });
+    const createdEv = appState.calendarEvents[appState.calendarEvents.length - 1];
+    markCurrentItemsAsSeen();
     await saveAppState();
     formElement.reset();
     const monthInput = document.querySelector("#calendar-month");
@@ -3796,14 +4155,23 @@ function wirePageContentEvents() {
       monthInput.value = eventDate.slice(0, 7);
     }
     const fb = document.querySelector("#cal-feedback");
-    if (fb) fb.textContent = "Evento salvo no calendário!";
+    if (fb) fb.textContent = "Evento salvo e notificação enviada para todos!";
     renderCalendar();
+    if (createdEv) {
+      await triggerSystemNotification({
+        title: `📅 Novo Evento: ${createdEv.title}`,
+        body: `${formatDate(createdEv.date)}${createdEv.time ? " às " + createdEv.time : ""} — ${createdEv.church}`,
+        tag: `cal_${createdEv.id}`,
+        url: "./calendario.html",
+      });
+    }
   });
 }
 
 async function initApp() {
   injectCriticalFixesCss();
   injectPwaTags();
+  registerAppServiceWorker();
   applyChurchLogoEverywhere();
   const currentPage = getCurrentPage();
   const savedUserId = localStorage.getItem(SESSION_KEY);
