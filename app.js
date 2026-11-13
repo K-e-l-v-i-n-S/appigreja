@@ -9,7 +9,7 @@ const CLOUD_DB_URL = "https://appigreja-1f504-default-rtdb.firebaseio.com";
 // Identificador único desta aba/aparelho para nunca reproduzir a própria voz no aparelho que transmite
 const DEVICE_INSTANCE_ID = `dev_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
-const CHURCHES = {
+const DEFAULT_CHURCHES = {
   sede: { name: "Igreja Sede", pastor: "Bispo Wagner", pastorId: "bispo-wagner" },
   campineiro: { name: "Igreja Campineiro", pastor: "Pastora Lindamir", pastorId: "pra-lindamir" },
   mogi: { name: "Igreja Mogi Guaçu", pastor: "Pastor Paulo", pastorId: "pr-paulo" },
@@ -20,12 +20,13 @@ const ROLE_LABELS = {
   lideranca: "Liderança",
   secretaria: "Secretaria",
   pastor: "Pastor",
+  adm_igreja: "ADM de Igreja",
   bispo: "Bispo",
-  adm: "ADM",
+  adm: "ADM Geral",
 };
 
-// SUBCARGOS E FUNÇÕES MINISTERIAIS
-const SUBROLE_LABELS = {
+// SUBCARGOS E FUNÇÕES MINISTERIAIS PADRÃO (Podem ser expandidos pelo botão "+ Adicionar Subcargo")
+const DEFAULT_SUBROLE_LABELS = {
   nenhum: "Sem subcargo específico",
   pastor_adm: "PASTOR ADM",
   pastor_aux: "PASTOR AUX",
@@ -43,23 +44,26 @@ const SUBROLE_LABELS = {
   lider_danca_mogi: "LÍDER DANÇA MOGI GUAÇU",
 };
 
-const ALL_ROLES = ["obreiro", "lideranca", "secretaria", "pastor", "bispo", "adm"];
+let CHURCHES = { ...DEFAULT_CHURCHES };
+let SUBROLE_LABELS = { ...DEFAULT_SUBROLE_LABELS };
+
+const ALL_ROLES = ["obreiro", "lideranca", "secretaria", "pastor", "adm_igreja", "bispo", "adm"];
 
 const PAGE_PERMISSIONS = {
-  "dashboard.html": ["secretaria", "pastor", "bispo", "adm"],
+  "dashboard.html": ["secretaria", "pastor", "adm_igreja", "bispo", "adm"],
   "visitas.html": ALL_ROLES,
   "nova-visita.html": ALL_ROLES,
   "zaqueus.html": ALL_ROLES,
   "calendario.html": ALL_ROLES,
   "biblioteca.html": ALL_ROLES,
-  "visao.html": ["lideranca", "secretaria", "pastor", "bispo", "adm"],
+  "visao.html": ["lideranca", "secretaria", "pastor", "adm_igreja", "bispo", "adm"],
   "notificacoes.html": ALL_ROLES,
   "perfil.html": ALL_ROLES,
   "radio.html": ALL_ROLES,
 };
 
 const NAV_ITEMS = [
-  { href: "dashboard.html", icon: "D", label: "Dashboard & Cargos", roles: ["secretaria", "pastor", "bispo", "adm"] },
+  { href: "dashboard.html", icon: "D", label: "Dashboard & Cargos", roles: ["secretaria", "pastor", "adm_igreja", "bispo", "adm"] },
   { href: "perfil.html", icon: "P", label: "Meu Perfil", roles: ALL_ROLES },
   { href: "radio.html", icon: "R", label: "Rádio Ao Vivo", roles: ALL_ROLES },
   { href: "visitas.html", icon: "V", label: "Visitas realizadas", roles: ALL_ROLES },
@@ -67,7 +71,7 @@ const NAV_ITEMS = [
   { href: "zaqueus.html", icon: "Z", label: "Zaqueus", roles: ALL_ROLES },
   { href: "calendario.html", icon: "C", label: "Calendário Igreja", roles: ALL_ROLES },
   { href: "biblioteca.html", icon: "B", label: "Biblioteca", roles: ALL_ROLES },
-  { href: "visao.html", icon: "G", label: "Visão Geral", roles: ["lideranca", "secretaria", "pastor", "bispo", "adm"] },
+  { href: "visao.html", icon: "G", label: "Visão Geral", roles: ["lideranca", "secretaria", "pastor", "adm_igreja", "bispo", "adm"] },
   { href: "notificacoes.html", icon: "N", label: "Notificações", roles: ALL_ROLES },
 ];
 
@@ -88,6 +92,8 @@ let lastPlayedChunkId = 0;
 function emptyState() {
   return {
     churchLogo: "",
+    customChurches: {},
+    customSubRoles: {},
     users: [],
     visits: [],
     zaqueus: [],
@@ -107,6 +113,20 @@ function emptyState() {
   };
 }
 
+function refreshDynamicCatalogs(stateObj = appState) {
+  CHURCHES = { ...DEFAULT_CHURCHES, ...(stateObj?.customChurches || {}) };
+  SUBROLE_LABELS = { ...DEFAULT_SUBROLE_LABELS, ...(stateObj?.customSubRoles || {}) };
+}
+
+function slugifyKey(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
 function normalizeChurchId(id) {
   if (id === "norte") return "campineiro";
   if (id === "leste") return "mogi";
@@ -118,6 +138,8 @@ function normalizeStateData(raw) {
   const parsed = raw || {};
   const state = {
     churchLogo: parsed.churchLogo || "",
+    customChurches: parsed.customChurches && typeof parsed.customChurches === "object" ? parsed.customChurches : {},
+    customSubRoles: parsed.customSubRoles && typeof parsed.customSubRoles === "object" ? parsed.customSubRoles : {},
     users: Array.isArray(parsed.users) ? parsed.users : base.users,
     visits: Array.isArray(parsed.visits) ? parsed.visits : base.visits,
     zaqueus: Array.isArray(parsed.zaqueus) ? parsed.zaqueus : base.zaqueus,
@@ -128,6 +150,8 @@ function normalizeStateData(raw) {
     radioLive: parsed.radioLive && typeof parsed.radioLive === "object" ? { ...base.radioLive, ...parsed.radioLive } : base.radioLive,
     radioMessages: Array.isArray(parsed.radioMessages) ? parsed.radioMessages : base.radioMessages,
   };
+
+  refreshDynamicCatalogs(state);
 
   state.users.forEach((u, index) => {
     u.churchId = normalizeChurchId(u.churchId);
@@ -561,7 +585,7 @@ function getCurrentPage() {
 
 function getHomePageForUser(user) {
   if (!user) return "index.html";
-  return ["secretaria", "pastor", "bispo", "adm"].includes(user.roleId) ? "dashboard.html" : "visitas.html";
+  return ["secretaria", "pastor", "adm_igreja", "bispo", "adm"].includes(user.roleId) ? "dashboard.html" : "visitas.html";
 }
 
 function normalizeEmail(value) {
@@ -714,50 +738,80 @@ function getAvatarHtml(user, size = 38) {
   return `<span class="avatar" style="width:${size}px; height:${size}px; flex-basis:${size}px;">${escapeHtml(getInitials(user?.name))}</span>`;
 }
 
-// Regras de Permissão e Privacidade
+// Regras de Permissão: Escopo Global (ADM Geral, Bispo, Secretaria Sede) vs Escopo Local (ADM de Igreja, Pastor/Secretaria Local)
 function isAdmin() {
-  return ["adm", "bispo", "pastor", "secretaria"].includes(currentUser?.roleId);
+  return ["adm", "bispo", "adm_igreja", "pastor", "secretaria"].includes(currentUser?.roleId);
+}
+
+// VISÃO GLOBAL: Apenas ADM Geral, Bispo e Secretaria da Igreja Sede veem todas as igrejas
+function hasGlobalScope(user = currentUser) {
+  if (!user) return false;
+  if (user.roleId === "adm" || user.roleId === "bispo") return true;
+  const isSecretaria = user.roleId === "secretaria" || user.subRoleId === "secretaria";
+  if (isSecretaria && user.churchId === "sede") return true;
+  return false;
+}
+
+// VISÃO LOCAL DE IGREJA: ADM de Igreja, Pastor/Pastor ADM e Secretaria Local veem tudo APENAS da igreja atribuída
+function isLocalChurchManager(user = currentUser) {
+  if (!user) return false;
+  return (
+    ["adm_igreja", "pastor", "secretaria", "lideranca"].includes(user.roleId) ||
+    ["pastor_adm", "pastor_aux", "secretaria", "lider_obreiro", "lider_zaqueu"].includes(user.subRoleId)
+  );
 }
 
 function canViewSecretariaData() {
   if (!currentUser) return false;
   return (
-    currentUser.roleId === "adm" ||
+    hasGlobalScope(currentUser) ||
+    currentUser.roleId === "adm_igreja" ||
     currentUser.roleId === "secretaria" ||
+    currentUser.roleId === "pastor" ||
     currentUser.subRoleId === "secretaria" ||
     currentUser.subRoleId === "pastor_adm"
   );
 }
 
 function canManageRoles() {
-  return ["adm", "bispo", "pastor", "secretaria"].includes(currentUser?.roleId);
+  return (
+    ["adm", "bispo", "adm_igreja", "pastor", "secretaria"].includes(currentUser?.roleId) ||
+    currentUser?.subRoleId === "pastor_adm"
+  );
 }
 
 function canBroadcastRadio() {
   if (!currentUser) return false;
   return Boolean(
     currentUser.roleId === "adm" ||
+      currentUser.roleId === "adm_igreja" ||
       currentUser.subRoleId === "pastor_adm" ||
       currentUser.canBroadcast
   );
 }
 
-function hasGlobalScope() {
-  return ["adm", "bispo", "secretaria"].includes(currentUser?.roleId) || currentUser?.subRoleId === "pastor_adm";
-}
-
 function canManageZaqueu() {
-  return ["lideranca", "pastor", "bispo", "adm"].includes(currentUser?.roleId) || currentUser?.subRoleId === "lider_zaqueu";
+  return (
+    ["lideranca", "pastor", "adm_igreja", "bispo", "adm"].includes(currentUser?.roleId) ||
+    currentUser?.subRoleId === "lider_zaqueu" ||
+    currentUser?.subRoleId === "pastor_adm"
+  );
 }
 
 function canViewAllVisits() {
-  return ["lideranca", "secretaria", "pastor", "bispo", "adm"].includes(currentUser?.roleId);
+  return hasGlobalScope() || isLocalChurchManager();
+}
+
+function getVisibleUsers() {
+  if (!currentUser) return [];
+  if (hasGlobalScope()) return appState.users;
+  return appState.users.filter((u) => u.churchId === currentUser.churchId);
 }
 
 function getVisibleVisits() {
   if (!currentUser) return [];
   if (hasGlobalScope()) return appState.visits;
-  if (currentUser.roleId === "pastor" || currentUser.roleId === "lideranca") {
+  if (isLocalChurchManager()) {
     return appState.visits.filter((visit) => visit.churchId === currentUser.churchId);
   }
   return appState.visits.filter((visit) => visit.visitorId === currentUser.id);
@@ -1825,29 +1879,82 @@ function injectSharedShell() {
   shell.insertAdjacentHTML("afterbegin", sidebarHtml);
   main.insertAdjacentHTML("afterbegin", topbarHtml);
 
-  // 1. PAINEL DE PESSOAS REGISTRADAS, SUBCARGOS, LOGO E RÁDIO NO DASHBOARD E VISÃO GERAL
+  // 1. PAINEL DE PESSOAS REGISTRADAS, SUBCARGOS DINÂMICOS, IGREJAS LOCAIS, LOGO E RÁDIO
   const dashboardScreen = document.querySelector("#dashboard") || document.querySelector("#visao");
   if (dashboardScreen && canManageRoles() && !document.querySelector("#gestao-cargos")) {
     const heading = dashboardScreen.querySelector(".section-heading");
+    const scopeLabel = hasGlobalScope()
+      ? "Visão Global (Todas as Igrejas)"
+      : `Visão Local Restrita (${currentUser.church})`;
+
+    const allowedRoleEntries = Object.entries(ROLE_LABELS).filter(([k]) =>
+      hasGlobalScope() ? true : !["adm", "bispo"].includes(k)
+    );
+    const allowedChurchEntries = Object.entries(CHURCHES).filter(([k]) =>
+      hasGlobalScope() ? true : k === currentUser.churchId
+    );
+
     const usersPanelHtml = `
       <section class="panel wide inline-admin-panel" id="gestao-cargos">
         <div class="panel-header">
           <div>
-            <p class="eyebrow">Administração Geral, Subcargos, Rádio e Logo</p>
-            <h3>Pessoas Registradas no Sistema (<span id="registered-users-count">0</span>)</h3>
+            <p class="eyebrow">Administração — ${escapeHtml(scopeLabel)}</p>
+            <h3>Pessoas Registradas no Seu Escopo (<span id="registered-users-count">0</span>)</h3>
           </div>
-          <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+          <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            <button class="secondary-button" type="button" id="toggle-add-subrole-box" style="padding: 6px 12px; min-height: 32px; font-size: 12px; border-color: var(--green); color: var(--green-dark);">
+              ➕ Adicionar Subcargo
+            </button>
+            ${
+              hasGlobalScope()
+                ? `<button class="secondary-button" type="button" id="toggle-add-church-box" style="padding: 6px 12px; min-height: 32px; font-size: 12px; border-color: var(--teal); color: var(--teal);">
+                    ⛪ Adicionar Igreja Local
+                  </button>`
+                : ""
+            }
             <label class="secondary-button" style="cursor: pointer; padding: 6px 12px; min-height: 32px; font-size: 12px;">
               🖼️ Trocar Logo do App
               <input type="file" id="upload-church-logo-input" accept="image/*" style="display: none;" />
             </label>
             <a class="secondary-button" href="perfil.html#secretaria-members-panel" style="padding: 6px 12px; min-height: 32px; font-size: 12px;">
-              🪪 Ver Fichas / Carteiras (Secretaria)
+              🪪 Fichas da Secretaria
             </a>
-            <button class="secondary-button danger-btn" type="button" id="reset-db-btn">Zerar Tudo</button>
+            ${
+              hasGlobalScope()
+                ? `<button class="secondary-button danger-btn" type="button" id="reset-db-btn">Zerar Tudo</button>`
+                : ""
+            }
           </div>
         </div>
-        <p style="margin: 6px 0 12px; font-size: 13px; color: var(--muted);" id="role-save-feedback">
+
+        <!-- Caixa Expansível: Adicionar Novo Subcargo / Função Ministerial -->
+        <div id="add-subrole-box" style="display: none; margin-top: 12px; padding: 14px; border: 2px solid #9bc6bb; border-radius: var(--radius); background: #ffffff;">
+          <strong style="display: block; margin-bottom: 8px;">➕ Cadastrar Novo Subcargo / Função Ministerial na Lista</strong>
+          <form id="add-subrole-form" style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <input id="new-subrole-name" type="text" placeholder="Ex: LÍDER DE JOVENS / DIÁCONO / TESOURARIA / MÍDIA" required style="flex: 1; min-width: 220px;" />
+            <button class="primary-button" type="submit">Salvar Subcargo na Lista</button>
+          </form>
+          <div id="custom-subroles-tags" class="tag-row" style="margin-top: 10px;"></div>
+        </div>
+
+        <!-- Caixa Expansível: Adicionar Nova Igreja Local -->
+        <div id="add-church-box" style="display: none; margin-top: 12px; padding: 14px; border: 2px solid #9bc6bb; border-radius: var(--radius); background: #ffffff;">
+          <strong style="display: block; margin-bottom: 8px;">⛪ Cadastrar Nova Igreja Local</strong>
+          <form id="add-church-form" class="form-grid" style="align-items: end;">
+            <label>
+              Nome da Igreja Local
+              <input id="new-church-name" type="text" placeholder="Ex: Igreja Hortolândia" required />
+            </label>
+            <label>
+              Pastor / Liderança Responsável
+              <input id="new-church-pastor" type="text" placeholder="Ex: Pastor Marcos" required />
+            </label>
+            <button class="primary-button" type="submit">Salvar Igreja Local</button>
+          </form>
+          <div id="custom-churches-tags" class="tag-row" style="margin-top: 10px;"></div>
+        </div>
+
+        <p style="margin: 8px 0 12px; font-size: 13px; color: var(--muted);" id="role-save-feedback">
           Defina abaixo o Cargo Principal, o Subcargo/Função Ministerial, a Igreja e quem pode transmitir na Rádio Ao Vivo:
         </p>
 
@@ -1872,24 +1979,24 @@ function injectSharedShell() {
               <label>
                 Igreja vinculada
                 <select name="churchId" required>
-                  <option value="sede">Igreja Sede (Bispo Wagner)</option>
-                  <option value="campineiro">Igreja Campineiro (Pastora Lindamir)</option>
-                  <option value="mogi">Igreja Mogi Guaçu (Pastor Paulo)</option>
+                  ${allowedChurchEntries
+                    .map(([k, ch]) => `<option value="${escapeHtml(k)}">${escapeHtml(ch.name)} (${escapeHtml(ch.pastor)})</option>`)
+                    .join("")}
                 </select>
               </label>
               <label>
                 Nível de Acesso Principal
                 <select name="roleId" required>
-                  ${Object.entries(ROLE_LABELS)
-                    .map(([k, v]) => `<option value="${k}">${v}</option>`)
+                  ${allowedRoleEntries
+                    .map(([k, v]) => `<option value="${escapeHtml(k)}">${escapeHtml(v)}</option>`)
                     .join("")}
                 </select>
               </label>
               <label>
                 Subcargo / Função Ministerial
-                <select name="subRoleId">
+                <select name="subRoleId" class="dynamic-subrole-select">
                   ${Object.entries(SUBROLE_LABELS)
-                    .map(([k, v]) => `<option value="${k}">${v}</option>`)
+                    .map(([k, v]) => `<option value="${escapeHtml(k)}">${escapeHtml(v)}</option>`)
                     .join("")}
                 </select>
               </label>
@@ -2066,6 +2173,14 @@ function injectSharedShell() {
 
 function buildUserRoleCardHtml(u) {
   const isSelf = u.id === currentUser?.id;
+  const globalAccess = hasGlobalScope();
+  const allowedRoleEntries = Object.entries(ROLE_LABELS).filter(([roleKey]) =>
+    globalAccess ? true : !["adm", "bispo"].includes(roleKey) || u.roleId === roleKey
+  );
+  const allowedChurchEntries = Object.entries(CHURCHES).filter(([chKey]) =>
+    globalAccess ? true : chKey === currentUser?.churchId || chKey === u.churchId
+  );
+
   return `
     <div class="user-role-row">
       <div style="display: flex; align-items: center; gap: 10px; min-width: 0;">
@@ -2073,15 +2188,15 @@ function buildUserRoleCardHtml(u) {
         <div style="min-width: 0;">
           <strong style="font-size: 15px; display: block;">${escapeHtml(u.name)} ${isSelf ? "(Você)" : ""}</strong>
           <small style="display:block; color: var(--muted);">E-mail: ${escapeHtml(u.login)}</small>
-          <small style="display:block; color: var(--teal); font-weight: 700;">Carteira: ${escapeHtml(u.memberCard || "Não informada")}</small>
+          <small style="display:block; color: var(--teal); font-weight: 700;">Carteira: ${escapeHtml(u.memberCard || "Não informada")} • ${escapeHtml(u.church)}</small>
         </div>
       </div>
 
       <label style="font-size: 11px; color: var(--muted); font-weight: 700; display: grid; gap: 4px;">
         Cargo Principal
-        <select class="user-role-select" data-user-id="${escapeHtml(u.id)}">
-          ${Object.entries(ROLE_LABELS)
-            .map(([roleKey, label]) => `<option value="${roleKey}" ${u.roleId === roleKey ? "selected" : ""}>${label}</option>`)
+        <select class="user-role-select" data-user-id="${escapeHtml(u.id)}" ${!globalAccess && ["adm", "bispo"].includes(u.roleId) ? "disabled" : ""}>
+          ${allowedRoleEntries
+            .map(([roleKey, label]) => `<option value="${escapeHtml(roleKey)}" ${u.roleId === roleKey ? "selected" : ""}>${escapeHtml(label)}</option>`)
             .join("")}
         </select>
       </label>
@@ -2090,16 +2205,16 @@ function buildUserRoleCardHtml(u) {
         Subcargo / Função
         <select class="user-subrole-select" data-user-id="${escapeHtml(u.id)}">
           ${Object.entries(SUBROLE_LABELS)
-            .map(([subKey, label]) => `<option value="${subKey}" ${(u.subRoleId || "nenhum") === subKey ? "selected" : ""}>${label}</option>`)
+            .map(([subKey, label]) => `<option value="${escapeHtml(subKey)}" ${(u.subRoleId || "nenhum") === subKey ? "selected" : ""}>${escapeHtml(label)}</option>`)
             .join("")}
         </select>
       </label>
 
       <label style="font-size: 11px; color: var(--muted); font-weight: 700; display: grid; gap: 4px;">
         Igreja Vinculada
-        <select class="user-church-select" data-user-id="${escapeHtml(u.id)}">
-          ${Object.entries(CHURCHES)
-            .map(([chKey, chObj]) => `<option value="${chKey}" ${u.churchId === chKey ? "selected" : ""}>${chObj.name}</option>`)
+        <select class="user-church-select" data-user-id="${escapeHtml(u.id)}" ${!globalAccess ? "disabled" : ""}>
+          ${allowedChurchEntries
+            .map(([chKey, chObj]) => `<option value="${escapeHtml(chKey)}" ${u.churchId === chKey ? "selected" : ""}>${escapeHtml(chObj.name)}</option>`)
             .join("")}
         </select>
       </label>
@@ -2242,19 +2357,101 @@ function wireUserRoleSelects(rootElement) {
   });
 }
 
+function renderCustomCatalogTags() {
+  refreshDynamicCatalogs(appState);
+
+  document.querySelectorAll(".dynamic-subrole-select").forEach((sel) => {
+    const val = sel.value || "nenhum";
+    sel.innerHTML = Object.entries(SUBROLE_LABELS)
+      .map(([k, v]) => `<option value="${escapeHtml(k)}">${escapeHtml(v)}</option>`)
+      .join("");
+    if (SUBROLE_LABELS[val]) sel.value = val;
+  });
+
+  const regChurchSelect = document.querySelector('#register-form select[name="churchId"]');
+  if (regChurchSelect) {
+    const currentVal = regChurchSelect.value || "sede";
+    regChurchSelect.innerHTML = Object.entries(CHURCHES)
+      .map(([k, ch]) => `<option value="${escapeHtml(k)}">${escapeHtml(ch.name)} (${escapeHtml(ch.pastor)})</option>`)
+      .join("");
+    if (CHURCHES[currentVal]) regChurchSelect.value = currentVal;
+  }
+
+  const subTagsEl = document.querySelector("#custom-subroles-tags");
+  if (subTagsEl) {
+    const customSubs = Object.entries(appState.customSubRoles || {});
+    subTagsEl.innerHTML = customSubs.length
+      ? customSubs
+          .map(
+            ([k, label]) => `
+            <span class="tag">
+              ${escapeHtml(label)}
+              <button type="button" class="del-custom-subrole-btn" data-key="${escapeHtml(k)}" style="border:0; background:transparent; color:var(--red); font-weight:900; margin-left:6px; cursor:pointer;" title="Remover subcargo">✕</button>
+            </span>
+          `
+          )
+          .join("")
+      : `<small style="color:var(--muted);">Digite acima qualquer subcargo novo e clique em Salvar para adicioná-lo a todas as listas.</small>`;
+
+    subTagsEl.querySelectorAll(".del-custom-subrole-btn").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const key = btn.dataset.key;
+        delete appState.customSubRoles[key];
+        refreshDynamicCatalogs(appState);
+        await saveAppState();
+        renderAll();
+      });
+    });
+  }
+
+  const churchTagsEl = document.querySelector("#custom-churches-tags");
+  if (churchTagsEl) {
+    const allCh = Object.entries(CHURCHES);
+    churchTagsEl.innerHTML = allCh
+      .map(([k, ch]) => {
+        const isCustom = !DEFAULT_CHURCHES[k];
+        return `
+          <span class="tag">
+            ⛪ ${escapeHtml(ch.name)} (${escapeHtml(ch.pastor)})
+            ${
+              isCustom
+                ? `<button type="button" class="del-custom-church-btn" data-key="${escapeHtml(k)}" style="border:0; background:transparent; color:var(--red); font-weight:900; margin-left:6px; cursor:pointer;" title="Remover igreja">✕</button>`
+                : ""
+            }
+          </span>
+        `;
+      })
+      .join("");
+
+    churchTagsEl.querySelectorAll(".del-custom-church-btn").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const key = btn.dataset.key;
+        if (!confirm(`Remover a igreja "${CHURCHES[key]?.name}"?`)) return;
+        delete appState.customChurches[key];
+        refreshDynamicCatalogs(appState);
+        await saveAppState();
+        renderAll();
+      });
+    });
+  }
+}
+
 function renderUsersRoleManager() {
+  renderCustomCatalogTags();
+  const visibleUsers = getVisibleUsers();
+
   const countBadge = document.querySelector("#registered-users-count");
-  if (countBadge) countBadge.textContent = String(appState.users.length);
+  if (countBadge) countBadge.textContent = String(visibleUsers.length);
 
   const pageContainer = document.querySelector("#page-users-list");
   if (!pageContainer) return;
 
-  if (!appState.users.length) {
-    pageContainer.innerHTML = emptyCard("Nenhuma pessoa registrada ainda.");
+  if (!visibleUsers.length) {
+    pageContainer.innerHTML = emptyCard("Nenhuma pessoa registrada nesta igreja ainda.");
     return;
   }
 
-  pageContainer.innerHTML = appState.users.map(buildUserRoleCardHtml).join("");
+  pageContainer.innerHTML = visibleUsers.map(buildUserRoleCardHtml).join("");
   wireUserRoleSelects(pageContainer);
 }
 
@@ -2329,10 +2526,11 @@ function renderProfilePage() {
   }
 
   secPanel.style.display = "block";
-  if (secCount) secCount.textContent = String(appState.users.length);
+  const scopedMembers = getVisibleUsers();
+  if (secCount) secCount.textContent = String(scopedMembers.length);
 
   const query = (document.querySelector("#secretaria-search")?.value || "").toLowerCase();
-  const filtered = appState.users.filter((u) => {
+  const filtered = scopedMembers.filter((u) => {
     const text = `${u.name} ${u.login} ${u.cpf || ""} ${u.memberCard || ""} ${u.church}`.toLowerCase();
     return !query || text.includes(query);
   });
@@ -3597,6 +3795,7 @@ function injectAuthRecoveryUI() {
 
 function wireAuth() {
   injectAuthRecoveryUI();
+  renderCustomCatalogTags();
 
   document.querySelector("#show-login")?.addEventListener("click", () => showAuthMode("login"));
   document.querySelector("#show-register")?.addEventListener("click", () => showAuthMode("register"));
@@ -3847,6 +4046,71 @@ function wirePageContentEvents() {
   });
   updatePushPermissionButtonUI();
   document.querySelector("#reset-db-btn")?.addEventListener("click", resetEntireDatabase);
+
+  // Abrir/fechar caixas de Adicionar Subcargo e Adicionar Igreja Local
+  document.querySelector("#toggle-add-subrole-box")?.addEventListener("click", () => {
+    const box = document.querySelector("#add-subrole-box");
+    if (box) {
+      box.style.display = box.style.display === "none" ? "block" : "none";
+      if (box.style.display === "block") {
+        document.querySelector("#new-subrole-name")?.focus();
+      }
+    }
+  });
+
+  document.querySelector("#toggle-add-church-box")?.addEventListener("click", () => {
+    const box = document.querySelector("#add-church-box");
+    if (box) {
+      box.style.display = box.style.display === "none" ? "block" : "none";
+      if (box.style.display === "block") {
+        document.querySelector("#new-church-name")?.focus();
+      }
+    }
+  });
+
+  // Salvar Novo Subcargo Dinâmico no Firebase
+  document.querySelector("#add-subrole-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const input = document.querySelector("#new-subrole-name");
+    const rawName = String(input?.value || "").trim().toUpperCase();
+    if (!rawName) return;
+    const key = `sub_${slugifyKey(rawName)}`;
+    appState.customSubRoles = appState.customSubRoles || {};
+    appState.customSubRoles[key] = rawName;
+    refreshDynamicCatalogs(appState);
+    await saveAppState();
+    if (input) input.value = "";
+    const fb = document.querySelector("#role-save-feedback");
+    if (fb) fb.textContent = `➕ Subcargo "${rawName}" adicionado à lista com sucesso!`;
+    renderAll();
+  });
+
+  // Salvar Nova Igreja Local Dinâmica no Firebase
+  document.querySelector("#add-church-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!hasGlobalScope()) return;
+    const nameInput = document.querySelector("#new-church-name");
+    const pastorInput = document.querySelector("#new-church-pastor");
+    const rawName = String(nameInput?.value || "").trim();
+    const rawPastor = String(pastorInput?.value || "").trim();
+    if (!rawName || !rawPastor) return;
+
+    const churchKey = slugifyKey(rawName) || `igr_${Date.now()}`;
+    const pastorKey = slugifyKey(rawPastor) || `pr_${Date.now()}`;
+    appState.customChurches = appState.customChurches || {};
+    appState.customChurches[churchKey] = {
+      name: rawName,
+      pastor: rawPastor,
+      pastorId: pastorKey,
+    };
+    refreshDynamicCatalogs(appState);
+    await saveAppState();
+    if (nameInput) nameInput.value = "";
+    if (pastorInput) pastorInput.value = "";
+    const fb = document.querySelector("#role-save-feedback");
+    if (fb) fb.textContent = `⛪ Igreja "${rawName}" (${rawPastor}) adicionada ao sistema!`;
+    renderAll();
+  });
 
   // Upload da Logo da Igreja pelo ADM
   document.querySelector("#upload-church-logo-input")?.addEventListener("change", async (event) => {
