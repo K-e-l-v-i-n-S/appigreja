@@ -403,13 +403,17 @@ function compressImageFile(file, maxSize = 240) {
 function getLogoHtml() {
   const customLogo = appState.churchLogo;
   if (customLogo) {
-    return `<img src="${customLogo}" alt="Logo da Igreja" style="width:100%; height:100%; object-fit:cover; border-radius:var(--radius);" />`;
+    return `<img src="${customLogo}" alt="Logo da Igreja" style="width:100%; height:100%; object-fit:contain; border-radius:4px; background:#ffffff;" />`;
   }
-  return `<img src="logo.png" alt="Logo" style="width:100%; height:100%; object-fit:cover; border-radius:var(--radius);" onerror="this.outerHTML='AI'" />`;
+  return `<img src="logo.png" alt="Logo" style="width:100%; height:100%; object-fit:contain; border-radius:4px; background:#ffffff;" onerror="this.outerHTML='<span style=&quot;color:#60171E;font-weight:900;&quot;>AI</span>'" />`;
 }
 
 function applyChurchLogoEverywhere() {
   document.querySelectorAll(".brand-mark").forEach((el) => {
+    el.style.background = "#ffffff";
+    el.style.color = "#60171E";
+    el.style.border = "2px solid #60171E";
+    el.style.padding = "3px";
     el.innerHTML = getLogoHtml();
   });
   if (appState.churchLogo) {
@@ -428,13 +432,71 @@ function injectCriticalFixesCss() {
   const style = document.createElement("style");
   style.id = "appigreja-fixes-css";
   style.textContent = `
+    :root {
+      color-scheme: dark;
+      --bg: #000000 !important;
+      --surface: #0d0d0d !important;
+      --surface-soft: #24080b !important;
+      --ink: #ffffff !important;
+      --muted: #d4d4d8 !important;
+      --line: #60171E !important;
+      --green: #60171E !important;
+      --green-dark: #ffffff !important;
+      --teal: #e5737d !important;
+      --gold: #f3b743 !important;
+      --red: #ef4444 !important;
+      --blue: #ffffff !important;
+    }
+    body {
+      background: #000000 !important;
+      color: #ffffff !important;
+    }
+    .brand-mark {
+      background: #ffffff !important;
+      color: #60171E !important;
+      border: 2px solid #60171E !important;
+      padding: 3px !important;
+    }
+    .sidebar {
+      background: #070707 !important;
+      border-right: 2px solid #60171E !important;
+    }
+    .nav-item:hover, .nav-item.active {
+      background: #60171E !important;
+      color: #ffffff !important;
+    }
+    .primary-button {
+      background: #60171E !important;
+      border-color: #8a2530 !important;
+      color: #ffffff !important;
+    }
+    .secondary-button, .ghost-button {
+      background: #141414 !important;
+      border-color: #60171E !important;
+      color: #ffffff !important;
+    }
+    .panel, .metric-card, .visit-form, .auth-card {
+      background: #0d0d0d !important;
+      border-color: #60171E !important;
+      color: #ffffff !important;
+    }
+    .visit-item, .zaqueu-card, .notification-item, .calendar-day, .calendar-event, .content-card, .week-box, .rank-list div {
+      background: #121212 !important;
+      border-color: #60171E !important;
+      color: #ffffff !important;
+    }
+    input, select, textarea {
+      background: #080808 !important;
+      border-color: #60171E !important;
+      color: #ffffff !important;
+    }
     body.is-authenticated .app-shell { display: grid !important; }
     body.is-authenticated .screen { display: block !important; }
     body.can-dashboard .dashboard-only { display: block !important; }
     .inline-admin-panel {
       margin-bottom: 20px;
-      border: 2px solid #9bc6bb;
-      background: #f5fbf8;
+      border: 2px solid #60171E !important;
+      background: #120406 !important;
     }
     .user-role-row {
       display: grid;
@@ -442,20 +504,21 @@ function injectCriticalFixesCss() {
       gap: 10px;
       align-items: center;
       padding: 12px;
-      border: 1px solid var(--line);
+      border: 1px solid #60171E;
       border-radius: var(--radius);
-      background: #ffffff;
+      background: #0d0d0d;
+      color: #ffffff;
     }
     .danger-btn {
-      color: var(--red) !important;
-      border-color: var(--red) !important;
-      background: #fff5f5 !important;
+      color: #ff6b6b !important;
+      border-color: #ef4444 !important;
+      background: #2a0808 !important;
       padding: 6px 10px !important;
       min-height: 32px !important;
       font-size: 12px !important;
     }
     .danger-btn:hover {
-      background: var(--red) !important;
+      background: #ef4444 !important;
       color: #ffffff !important;
     }
     .live-banner {
@@ -466,15 +529,16 @@ function injectCriticalFixesCss() {
       padding: 10px 16px;
       margin-bottom: 18px;
       border-radius: var(--radius);
-      background: linear-gradient(90deg, #b33a30, #d9534f);
+      background: linear-gradient(90deg, #60171E, #a32a36);
       color: #ffffff;
       font-weight: 800;
-      box-shadow: 0 8px 20px rgba(179, 58, 48, 0.25);
+      box-shadow: 0 8px 20px rgba(96, 23, 30, 0.45);
     }
     .member-badge-card {
       padding: 18px;
       border-radius: 12px;
-      background: linear-gradient(145deg, #18342f, #2f6f5e);
+      background: linear-gradient(145deg, #1a0507, #60171E);
+      border: 1px solid #8a2530;
       color: #ffffff;
       display: grid;
       gap: 14px;
@@ -493,15 +557,15 @@ function injectCriticalFixesCss() {
       gap: 10px;
       padding: 10px 14px;
       border-radius: 999px;
-      background: #18342f;
+      background: #0d0d0d;
       color: #ffffff;
-      border: 2px solid #2f6f5e;
-      box-shadow: 0 14px 34px rgba(0, 0, 0, 0.28);
+      border: 2px solid #60171E;
+      box-shadow: 0 14px 34px rgba(0, 0, 0, 0.65);
       cursor: pointer;
     }
     .radio-mini-bar.is-live {
       border-color: #ef4444;
-      background: linear-gradient(135deg, #7f1d1d, #18342f);
+      background: linear-gradient(135deg, #60171E, #0d0d0d);
     }
     .radio-mini-dot {
       width: 12px;
@@ -521,10 +585,10 @@ function injectCriticalFixesCss() {
       overflow-y: auto;
       padding: 16px;
       border-radius: 14px;
-      background: var(--surface);
-      color: var(--ink);
-      border: 2px solid #2f6f5e;
-      box-shadow: 0 24px 64px rgba(0, 0, 0, 0.32);
+      background: #0d0d0d;
+      color: #ffffff;
+      border: 2px solid #60171E;
+      box-shadow: 0 24px 64px rgba(0, 0, 0, 0.8);
       gap: 14px;
     }
     .radio-popup-widget.is-open .radio-mini-bar {
@@ -554,7 +618,7 @@ function injectCriticalFixesCss() {
       border: 0 !important;
       border-radius: 6px;
       background: transparent !important;
-      color: var(--muted);
+      color: #ffffff;
       font-size: 17px;
       display: grid;
       place-items: center;
@@ -562,13 +626,12 @@ function injectCriticalFixesCss() {
       user-select: none;
     }
     .password-toggle-btn:hover {
-      background: rgba(47, 111, 94, 0.1) !important;
-      color: var(--green-dark);
+      background: rgba(96, 23, 30, 0.35) !important;
     }
     .forgot-link-btn {
       border: 0;
       background: transparent;
-      color: var(--teal);
+      color: #e5737d;
       font-size: 13px;
       font-weight: 800;
       padding: 4px 0;
@@ -581,9 +644,10 @@ function injectCriticalFixesCss() {
     }
     .recovery-result-box {
       padding: 14px;
-      border: 2px solid #9bc6bb;
+      border: 2px solid #60171E;
       border-radius: var(--radius);
-      background: #f5fbf8;
+      background: #120406;
+      color: #ffffff;
       display: grid;
       gap: 12px;
     }
@@ -601,10 +665,11 @@ function injectCriticalFixesCss() {
       pointer-events: auto;
       padding: 14px 16px;
       border-radius: 12px;
-      background: #18342f;
+      background: #0d0d0d;
       color: #ffffff;
-      border-left: 5px solid #f3b743;
-      box-shadow: 0 18px 42px rgba(0, 0, 0, 0.32);
+      border: 1px solid #60171E;
+      border-left: 5px solid #60171E;
+      box-shadow: 0 18px 42px rgba(0, 0, 0, 0.7);
       display: grid;
       gap: 6px;
       cursor: pointer;
@@ -643,7 +708,7 @@ function injectPwaTags() {
   if (!document.querySelector('meta[name="theme-color"]')) {
     const meta = document.createElement("meta");
     meta.name = "theme-color";
-    meta.content = "#18342f";
+    meta.content = "#60171E";
     document.head.appendChild(meta);
   }
 }
@@ -1447,7 +1512,7 @@ function injectRadioPopupWidget() {
           <strong id="popup-mini-title" style="font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:190px;">📻 Rádio Ao Vivo</strong>
           <small id="popup-mini-sub" style="font-size:11px; opacity:0.85;">Toque para abrir o player</small>
         </div>
-        <button type="button" id="popup-mini-listen-btn" class="primary-button" style="background:#f3b743; color:#18342f; min-height:30px; padding:4px 10px; font-size:12px; font-weight:900;">
+        <button type="button" id="popup-mini-listen-btn" class="primary-button" style="background:#60171E; color:#ffffff; border:1px solid #ffffff; min-height:30px; padding:4px 10px; font-size:12px; font-weight:900;">
           🔊 Ouvir
         </button>
         <button type="button" id="popup-mini-expand-btn" class="secondary-button" style="min-height:30px; padding:4px 8px; font-size:12px;">
@@ -1473,7 +1538,7 @@ function injectRadioPopupWidget() {
         </header>
 
         <!-- Caixa do Player (Ouvintes) -->
-        <div style="padding:14px; border-radius:10px; background:linear-gradient(135deg, #18342f, #2f6f5e); color:#ffffff; display:grid; gap:10px;">
+        <div style="padding:14px; border-radius:10px; background:linear-gradient(135deg, #1a0507, #60171E); color:#ffffff; display:grid; gap:10px;">
           <div style="display:flex; align-items:center; gap:10px;">
             <div id="popup-radio-live-indicator" style="width:14px; height:14px; border-radius:50%; background:#9ca3af; flex:0 0 14px;"></div>
             <div style="min-width:0;">
@@ -1483,7 +1548,7 @@ function injectRadioPopupWidget() {
           </div>
 
           <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-            <button class="primary-button" type="button" id="popup-listen-radio-btn" style="background:#f3b743; color:#18342f; font-weight:900; width:100%;">
+            <button class="primary-button" type="button" id="popup-listen-radio-btn" style="background:#60171E; color:#ffffff; border:1px solid #ffffff; font-weight:900; width:100%;">
               🔊 Conectar Áudio para Ouvir
             </button>
             <small id="popup-listener-audio-status" style="font-size:12px; opacity:0.92;">Toque acima para ouvir enquanto navega pelo app.</small>
@@ -1493,7 +1558,7 @@ function injectRadioPopupWidget() {
         </div>
 
         <!-- Estúdio de Transmissão (Visível para ADM ou quem tem permissão de Rádio) -->
-        <div id="popup-radio-broadcaster-studio" style="padding:12px; border:2px solid #9bc6bb; border-radius:10px; background:#f5fbf8; display:none;">
+        <div id="popup-radio-broadcaster-studio" style="padding:12px; border:2px solid #60171E; border-radius:10px; background:#120406; color:#ffffff; display:none;">
           <p class="eyebrow" style="margin-bottom:6px;">🎙️ Estúdio do Locutor (Somente Entrada / Sem Eco)</p>
           <div class="stack-form" style="gap:10px;">
             <label style="font-size:12px;">
@@ -1778,13 +1843,13 @@ function updatePushPermissionButtonUI() {
   const granted = "Notification" in window && Notification.permission === "granted";
   if (granted) {
     btn.textContent = "🔔 Alertas Ativos";
-    btn.style.background = "#e4f3ef";
-    btn.style.color = "var(--green-dark)";
-    btn.style.borderColor = "#9bc6bb";
+    btn.style.background = "#60171E";
+    btn.style.color = "#ffffff";
+    btn.style.borderColor = "#8a2530";
   } else {
     btn.textContent = "🔔 Ativar Alertas";
-    btn.style.background = "#fff3d9";
-    btn.style.color = "#7b570f";
+    btn.style.background = "#24080b";
+    btn.style.color = "#ffffff";
     btn.style.borderColor = "#f3b743";
   }
 }
@@ -2026,7 +2091,7 @@ function injectSharedShell() {
         </div>
 
         <!-- Caixa Expansível 1: Adicionar Novo Cargo Principal / Função Principal -->
-        <div id="add-role-box" style="display: none; margin-top: 12px; padding: 14px; border: 2px solid var(--blue); border-radius: var(--radius); background: #ffffff;">
+        <div id="add-role-box" style="display: none; margin-top: 12px; padding: 14px; border: 2px solid #60171E; border-radius: var(--radius); background: #0d0d0d; color: #ffffff;">
           <strong style="display: block; margin-bottom: 8px;">➕ Cadastrar Novo Cargo / Função Principal</strong>
           <form id="add-role-form" class="form-grid" style="align-items: end;">
             <label>
@@ -2048,7 +2113,7 @@ function injectSharedShell() {
         </div>
 
         <!-- Caixa Expansível 2: Adicionar Novo Subcargo / Função Ministerial -->
-        <div id="add-subrole-box" style="display: none; margin-top: 12px; padding: 14px; border: 2px solid #9bc6bb; border-radius: var(--radius); background: #ffffff;">
+        <div id="add-subrole-box" style="display: none; margin-top: 12px; padding: 14px; border: 2px solid #60171E; border-radius: var(--radius); background: #0d0d0d; color: #ffffff;">
           <strong style="display: block; margin-bottom: 8px;">➕ Cadastrar Novo Subcargo / Função Ministerial na Lista</strong>
           <form id="add-subrole-form" style="display: flex; gap: 8px; flex-wrap: wrap;">
             <input id="new-subrole-name" type="text" placeholder="Ex: LÍDER DE JOVENS / DIÁCONO / MÍDIA / INFANTIL" required style="flex: 1; min-width: 220px;" />
@@ -2058,7 +2123,7 @@ function injectSharedShell() {
         </div>
 
         <!-- Caixa Expansível 3: Adicionar Nova Igreja Local -->
-        <div id="add-church-box" style="display: none; margin-top: 12px; padding: 14px; border: 2px solid #9bc6bb; border-radius: var(--radius); background: #ffffff;">
+        <div id="add-church-box" style="display: none; margin-top: 12px; padding: 14px; border: 2px solid #60171E; border-radius: var(--radius); background: #0d0d0d; color: #ffffff;">
           <strong style="display: block; margin-bottom: 8px;">⛪ Cadastrar Nova Igreja Local</strong>
           <form id="add-church-form" class="form-grid" style="align-items: end;">
             <label>
@@ -2117,7 +2182,7 @@ function injectSharedShell() {
               <strong style="font-size: 13px; color: var(--muted); display: block; margin-bottom: 6px;">
                 Selecione 1 ou mais Subcargos / Funções Ministeriais (Opcional):
               </strong>
-              <div id="new-user-subroles-checkboxes" style="display: flex; gap: 8px; flex-wrap: wrap; padding: 10px; border: 1px solid var(--line); border-radius: var(--radius); background: #ffffff;"></div>
+              <div id="new-user-subroles-checkboxes" style="display: flex; gap: 8px; flex-wrap: wrap; padding: 10px; border: 1px solid #60171E; border-radius: var(--radius); background: #0d0d0d; color: #ffffff;"></div>
             </div>
             <div class="form-actions">
               <span id="admin-add-user-msg" style="font-weight: 700; color: var(--green);"></span>
@@ -2311,7 +2376,7 @@ function buildUserRoleCardHtml(u) {
         `
         )
         .join("")
-    : `<span class="tag" style="background:#eef4f1; color:var(--muted); font-size:11px;">Sem subcargos</span>`;
+    : `<span class="tag" style="background:#24080b; color:#ffffff; font-size:11px;">Sem subcargos</span>`;
 
   const availableSubRoleOptions = Object.entries(SUBROLE_LABELS)
     .filter(([subKey]) => subKey !== "nenhum" && !userSubRoles.includes(subKey))
@@ -2540,7 +2605,7 @@ function renderCustomCatalogTags() {
       .filter(([k]) => k !== "nenhum")
       .map(
         ([k, label]) => `
-        <label style="display:inline-flex; align-items:center; gap:5px; padding:4px 8px; border:1px solid var(--line); border-radius:6px; font-size:12px; cursor:pointer; background:#f8faf9;">
+        <label style="display:inline-flex; align-items:center; gap:5px; padding:4px 8px; border:1px solid var(--line); border-radius:6px; font-size:12px; cursor:pointer; background:#141414; color:#ffffff;">
           <input type="checkbox" name="subRoles" value="${escapeHtml(k)}" style="min-height:16px; width:16px;" />
           ${escapeHtml(label)}
         </label>
@@ -2698,7 +2763,7 @@ function renderProfilePage() {
               <small style="opacity: 0.8;">${escapeHtml(currentUser.pastor)}</small>
             </div>
           </div>
-          <span class="tag" style="background: #f3b743; color: #18342f;">${escapeHtml(currentUser.memberCard || "IGR-0001")}</span>
+          <span class="tag" style="background: #60171E; color: #ffffff; border: 1px solid #ffffff;">${escapeHtml(currentUser.memberCard || "IGR-0001")}</span>
         </div>
 
         <div style="display: flex; align-items: center; gap: 14px;">
@@ -2764,7 +2829,7 @@ function renderProfilePage() {
                   </div>
                 </div>
               </div>
-              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-top: 10px; padding: 10px; background: #f4f6f3; border-radius: 6px; font-size: 13px;">
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-top: 10px; padding: 10px; background: #080808; color: #ffffff; border-radius: 6px; font-size: 13px;">
                 <div><strong>CPF:</strong> ${escapeHtml(u.cpf || "Não preenchido")}</div>
                 <div><strong>Aniversário:</strong> ${escapeHtml(formatDate(u.birthDate) || "Não preenchido")}</div>
                 <div><strong>Batismo:</strong> ${escapeHtml(formatDate(u.baptismDate) || "Não preenchido")}</div>
@@ -2828,8 +2893,8 @@ function renderRadioPage() {
     const badge = document.querySelector(sel);
     if (!badge) return;
     badge.textContent = live.active ? "🔴 AO VIVO AGORA" : "Offline no momento";
-    badge.style.background = live.active ? "#fde8e8" : "#e8f0fb";
-    badge.style.color = live.active ? "#b33a30" : "var(--blue)";
+    badge.style.background = live.active ? "#60171E" : "#141414";
+    badge.style.color = "#ffffff";
   });
 
   // Atualiza indicadores luminosos
@@ -2889,7 +2954,7 @@ function renderRadioPage() {
         .slice(0, 40)
         .map(
           (m) => `
-        <div style="padding: 9px 10px; border: 1px solid var(--line); border-radius: 6px; background: #fbfdfc;">
+        <div style="padding: 9px 10px; border: 1px solid var(--line); border-radius: 6px; background: #121212; color: #ffffff;">
           <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:11px; color:var(--muted);">
             <strong>${escapeHtml(m.author)} (${escapeHtml(m.church)})</strong>
             <div style="display:flex; align-items:center; gap:6px;">
