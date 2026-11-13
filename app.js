@@ -1256,11 +1256,40 @@ function renderRadioPage() {
   }
 }
 
+// Identificador único desta aba/aparelho para nunca tocar a própria voz no aparelho que transmite
+const DEVICE_INSTANCE_ID = `dev_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+let isBroadcastingMic = false;
+let currentPlayingAudio = null;
+
 async function startMicrophoneBroadcast() {
   if (!canBroadcastRadio()) return;
   const title = document.querySelector("#broadcast-title")?.value.trim() || "Palavra Pastoral Ao Vivo";
   const streamUrl = document.querySelector("#broadcast-stream-url")?.value.trim() || "";
   const feedback = document.querySelector("#broadcaster-feedback");
+
+  // 1. Trava imediatamente qualquer saída de áudio neste aparelho (Modo Somente Entrada de Voz)
+  isListeningRadio = false;
+  isBroadcastingMic = true;
+  if (currentPlayingAudio) {
+    currentPlayingAudio.pause();
+    currentPlayingAudio = null;
+  }
+  const extPlayer = document.querySelector("#external-audio-player");
+  if (extPlayer) {
+    extPlayer.pause();
+    extPlayer.muted = true;
+  }
+
+  const listenBtn = document.querySelector("#listen-radio-btn");
+  const statusEl = document.querySelector("#listener-audio-status");
+  if (listenBtn) {
+    listenBtn.disabled = true;
+    listenBtn.style.opacity = "0.5";
+    listenBtn.textContent = "🔇 Saída Mutada (Modo Locutor)";
+  }
+  if (statusEl) {
+    statusEl.textContent = "Somente entrada de voz ativa neste aparelho (saída desligada para evitar retorno/eco).";
+  }
 
   appState.radioLive = {
     active: true,
@@ -1279,18 +1308,30 @@ async function startMicrophoneBroadcast() {
   }
 
   try {
-    micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    if (feedback) feedback.textContent = "🔴 MICROFONE NO AR! Tudo o que você falar agora está sendo enviado ao vivo.";
+    // 2. Ativa o microfone com Cancelamento de Eco e Supressão de Ruído nativos
+    micStream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      },
+      video: false,
+    });
+
+    // Garante que nenhuma trilha de monitoramento local seja roteada para o alto-falante
+    if (feedback) {
+      feedback.textContent = "🔴 MICROFONE NO AR (Somente Entrada)! Saída de som bloqueada neste aparelho para não dar eco.";
+    }
 
     const recordAndSendChunk = () => {
-      if (!micStream || !appState.radioLive?.active) return;
+      if (!micStream || !isBroadcastingMic || !appState.radioLive?.active) return;
       const recorder = new MediaRecorder(micStream);
       const chunks = [];
       recorder.ondataavailable = (e) => {
         if (e.data && e.data.size > 0) chunks.push(e.data);
       };
       recorder.onstop = () => {
-        if (!chunks.length) return;
+        if (!chunks.length || !isBroadcastingMic) return;
         const blob = new Blob(chunks, { type: recorder.mimeType || "audio/webm" });
         const reader = new FileReader();
         reader.onloadend = async () => {
@@ -1302,6 +1343,7 @@ async function startMicrophoneBroadcast() {
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 id: Date.now(),
+                deviceId: DEVICE_INSTANCE_ID,
                 speaker: currentUser.name,
                 audioUrl: String(reader.result || ""),
               }),
@@ -1322,6 +1364,7 @@ async function startMicrophoneBroadcast() {
     if (micRecorderInterval) clearInterval(micRecorderInterval);
     micRecorderInterval = setInterval(recordAndSendChunk, 2500);
   } catch (err) {
+    isBroadcastingMic = false;
     if (feedback) {
       feedback.textContent = "Permissão de microfone negada no navegador. Libere o microfone no cadeado da barra de endereços!";
     }
@@ -1329,6 +1372,7 @@ async function startMicrophoneBroadcast() {
 }
 
 async function stopBroadcast() {
+  isBroadcastingMic = false;
   if (micRecorderInterval) {
     clearInterval(micRecorderInterval);
     micRecorderInterval = null;
@@ -1337,6 +1381,13 @@ async function stopBroadcast() {
     micStream.getTracks().forEach((t) => t.stop());
     micStream = null;
   }
+
+  // Limpa o último pacote de áudio da nuvem ao encerrar para ninguém ouvir sobra
+  const chunkEndpoint = getCloudEndpoint("appigreja_radio_chunk");
+  if (chunkEndpoint) {
+    fetch(chunkEndpoint, { method: "DELETE" }).catch(() => {});
+  }
+
   appState.radioLive = {
     active: false,
     title: "",
@@ -1346,38 +1397,90 @@ async function stopBroadcast() {
     updatedAt: Date.now(),
   };
   await saveAppState();
+
+  const listenBtn = document.querySelector("#listen-radio-btn");
+  const statusEl = document.querySelector("#listener-audio-status");
+  if (listenBtn) {
+    listenBtn.disabled = false;
+    listenBtn.style.opacity = "1";
+    listenBtn.textContent = "🔊 Conectar Áudio para Ouvir";
+  }
+  if (statusEl) {
+    statusEl.textContent = "Transmissão encerrada. Toque no botão amarelo se quiser ouvir outra pessoa.";
+  }
+
   const feedback = document.querySelector("#broadcaster-feedback");
-  if (feedback) feedback.textContent = "Transmissão encerrada.";
+  if (feedback) feedback.textContent = "⏹️ Transmissão encerrada e microfone desligado.";
   renderRadioPage();
 }
 
+let radioListenerInterval = null;
+
 function startListeningRadioLoop() {
-  isListeningRadio = true;
+  // Se este aparelho estiver transmitindo pelo microfone, bloqueia a saída de áudio
+  if (isBroadcastingMic) {
+    const statusEl = document.querySelector("#listener-audio-status");
+    if (statusEl) {
+      statusEl.textContent = "🔇 Você está transmitindo neste aparelho! A saída de som fica desligada aqui para evitar retorno.";
+    }
+    return;
+  }
+
+  isListeningRadio = !isListeningRadio;
+  const listenBtn = document.querySelector("#listen-radio-btn");
   const statusEl = document.querySelector("#listener-audio-status");
+  const extPlayer = document.querySelector("#external-audio-player");
+
+  if (!isListeningRadio) {
+    if (currentPlayingAudio) {
+      currentPlayingAudio.pause();
+      currentPlayingAudio = null;
+    }
+    if (extPlayer) extPlayer.pause();
+    if (listenBtn) listenBtn.textContent = "🔊 Conectar Áudio para Ouvir";
+    if (statusEl) statusEl.textContent = "🔇 Áudio silenciado neste aparelho.";
+    return;
+  }
+
+  if (listenBtn) listenBtn.textContent = "🔇 Silenciar Rádio neste Aparelho";
   if (statusEl) statusEl.textContent = "✅ Sintonizado! Aguardando voz ao vivo...";
 
-  const extPlayer = document.querySelector("#external-audio-player");
   if (extPlayer && appState.radioLive?.streamUrl) {
+    extPlayer.muted = false;
     extPlayer.play().catch(() => {});
   }
 
-  setInterval(async () => {
-    if (!isListeningRadio) return;
+  if (radioListenerInterval) clearInterval(radioListenerInterval);
+  radioListenerInterval = setInterval(async () => {
+    // Nunca reproduz saída de som se estiver transmitindo ou se o ouvinte silenciou
+    if (!isListeningRadio || isBroadcastingMic) return;
+
     const endpoint = getCloudEndpoint("appigreja_radio_chunk");
     if (!endpoint) return;
     try {
       const res = await fetch(endpoint, { cache: "no-store" });
       if (!res.ok) return;
       const chunk = await res.json();
-      if (chunk && chunk.id && chunk.id !== lastPlayedChunkId && Date.now() - chunk.id < 15000) {
+
+      // Ignora se o pacote veio deste mesmo aparelho (DEVICE_INSTANCE_ID)
+      if (!chunk || !chunk.id || chunk.deviceId === DEVICE_INSTANCE_ID) return;
+
+      if (chunk.id !== lastPlayedChunkId && Date.now() - chunk.id < 15000) {
         lastPlayedChunkId = chunk.id;
-        if (chunk.audioUrl) {
-          const audio = new Audio(chunk.audioUrl);
-          audio.play().catch(() => {});
+        if (chunk.audioUrl && !isBroadcastingMic) {
+          if (currentPlayingAudio) {
+            currentPlayingAudio.pause();
+          }
+          currentPlayingAudio = new Audio(chunk.audioUrl);
+          currentPlayingAudio.play().catch(() => {});
           if (statusEl) statusEl.textContent = `🔊 Ouvindo ao vivo: ${chunk.speaker || "Locutor"}`;
         }
       }
     } catch {
+      // ignora oscilações de rede
+    }
+  }, 1800);
+}
       // ignora oscilações de rede
     }
   }, 1800);
