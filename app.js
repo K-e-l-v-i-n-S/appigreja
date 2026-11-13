@@ -5,6 +5,9 @@ const CLOUD_INIT_KEY = "appigreja_cloud_initialized_v1";
 // LINK DO SEU FIREBASE REALTIME DATABASE JÁ CONFIGURADO:
 const CLOUD_DB_URL = "https://appigreja-1f504-default-rtdb.firebaseio.com";
 
+// Identificador único desta aba/aparelho para nunca reproduzir a própria voz no aparelho que transmite
+const DEVICE_INSTANCE_ID = `dev_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
 const CHURCHES = {
   sede: { name: "Igreja Sede", pastor: "Bispo Wagner", pastorId: "bispo-wagner" },
   campineiro: { name: "Igreja Campineiro", pastor: "Pastora Lindamir", pastorId: "pra-lindamir" },
@@ -20,7 +23,7 @@ const ROLE_LABELS = {
   adm: "ADM",
 };
 
-// SUBCARGOS E FUNÇÕES MINISTERIAIS SOLICITADOS
+// SUBCARGOS E FUNÇÕES MINISTERIAIS
 const SUBROLE_LABELS = {
   nenhum: "Sem subcargo específico",
   pastor_adm: "PASTOR ADM",
@@ -71,9 +74,14 @@ const MONTHS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun"];
 
 let appState = loadAppState();
 let currentUser = null;
+
+// Variáveis de controle da Rádio Ao Vivo (Anti-Eco)
 let micStream = null;
 let micRecorderInterval = null;
+let isBroadcastingMic = false;
 let isListeningRadio = false;
+let radioListenerInterval = null;
+let currentPlayingAudio = null;
 let lastPlayedChunkId = 0;
 
 function emptyState() {
@@ -199,10 +207,8 @@ async function syncFromCloud() {
     } else if (cloudData === null) {
       const wasInitialized = localStorage.getItem(CLOUD_INIT_KEY) === "true";
       if (!wasInitialized && appState.users.length > 0) {
-        // Primeira conexão com o Firebase: sobe os cadastros locais existentes para o banco
         await saveAppState();
       } else if (wasInitialized) {
-        // O banco foi apagado lá no painel do Firebase: limpa o cache local para não ressuscitar
         appState = emptyState();
         localStorage.removeItem(STORAGE_KEY);
         localStorage.removeItem(SESSION_KEY);
@@ -256,7 +262,6 @@ async function resetEntireDatabase() {
   window.location.replace("index.html");
 }
 
-// Redimensiona e comprime imagens (Foto de Perfil e Logo da Igreja) para salvar rápido no Firebase
 function compressImageFile(file, maxSize = 240) {
   return new Promise((resolve) => {
     if (!file) {
@@ -506,7 +511,6 @@ function isAdmin() {
   return ["adm", "bispo", "pastor", "secretaria"].includes(currentUser?.roleId);
 }
 
-// SOMENTE ADM, SECRETARIA e PASTOR ADM podem ver as fichas de membros (CPF, endereço, carteira) de todos
 function canViewSecretariaData() {
   if (!currentUser) return false;
   return (
@@ -1131,7 +1135,6 @@ function renderProfilePage() {
     `;
   }
 
-  // Painel Exclusivo ADM e Secretaria
   const secPanel = document.querySelector("#secretaria-members-panel");
   const secList = document.querySelector("#secretaria-members-list");
   const secCount = document.querySelector("#secretaria-count");
@@ -1224,7 +1227,7 @@ function renderRadioPage() {
     stopBtn.style.display = live.active && canBroadcastRadio() ? "inline-flex" : "none";
   }
   if (extPlayer) {
-    if (live.active && live.streamUrl) {
+    if (live.active && live.streamUrl && !isBroadcastingMic) {
       extPlayer.style.display = "block";
       if (extPlayer.src !== live.streamUrl) {
         extPlayer.src = live.streamUrl;
@@ -1256,11 +1259,7 @@ function renderRadioPage() {
   }
 }
 
-// Identificador único desta aba/aparelho para nunca tocar a própria voz no aparelho que transmite
-const DEVICE_INSTANCE_ID = `dev_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-let isBroadcastingMic = false;
-let currentPlayingAudio = null;
-
+// Transmissão Ao Vivo com trava Anti-Eco (Somente Entrada no aparelho locutor)
 async function startMicrophoneBroadcast() {
   if (!canBroadcastRadio()) return;
   const title = document.querySelector("#broadcast-title")?.value.trim() || "Palavra Pastoral Ao Vivo";
@@ -1318,7 +1317,6 @@ async function startMicrophoneBroadcast() {
       video: false,
     });
 
-    // Garante que nenhuma trilha de monitoramento local seja roteada para o alto-falante
     if (feedback) {
       feedback.textContent = "🔴 MICROFONE NO AR (Somente Entrada)! Saída de som bloqueada neste aparelho para não dar eco.";
     }
@@ -1414,8 +1412,6 @@ async function stopBroadcast() {
   renderRadioPage();
 }
 
-let radioListenerInterval = null;
-
 function startListeningRadioLoop() {
   // Se este aparelho estiver transmitindo pelo microfone, bloqueia a saída de áudio
   if (isBroadcastingMic) {
@@ -1452,7 +1448,6 @@ function startListeningRadioLoop() {
 
   if (radioListenerInterval) clearInterval(radioListenerInterval);
   radioListenerInterval = setInterval(async () => {
-    // Nunca reproduz saída de som se estiver transmitindo ou se o ouvinte silenciou
     if (!isListeningRadio || isBroadcastingMic) return;
 
     const endpoint = getCloudEndpoint("appigreja_radio_chunk");
@@ -1477,10 +1472,6 @@ function startListeningRadioLoop() {
         }
       }
     } catch {
-      // ignora oscilações de rede
-    }
-  }, 1800);
-}
       // ignora oscilações de rede
     }
   }, 1800);
