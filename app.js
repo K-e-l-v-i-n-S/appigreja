@@ -6,6 +6,9 @@ const SEEN_ALERTS_KEY = "appigreja_seen_alerts_v1";
 // LINK DO SEU FIREBASE REALTIME DATABASE JÁ CONFIGURADO:
 const CLOUD_DB_URL = "https://appigreja-1f504-default-rtdb.firebaseio.com";
 
+// Logotipo Oficial Embutido da Carteirinha (Igreja Evangélica Restauração)
+const IER_CARD_LOGO_DATA_URL = "data:image/png;base64,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";
+
 // Identificador único desta aba/aparelho para nunca reproduzir a própria voz no aparelho que transmite
 const DEVICE_INSTANCE_ID = `dev_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
@@ -261,6 +264,7 @@ function normalizeStateData(raw) {
     u.birthDate = u.birthDate || "";
     u.phone = u.phone || "";
     u.baptismDate = u.baptismDate || "";
+    u.maritalStatus = u.maritalStatus || "SP";
     u.address = u.address || "";
   });
 
@@ -554,16 +558,192 @@ function injectCriticalFixesCss() {
       font-weight: 800;
       box-shadow: 0 8px 20px rgba(96, 23, 30, 0.45);
     }
-    .member-badge-card {
-      padding: 18px;
-      border-radius: 12px;
-      background: linear-gradient(145deg, #1a0507, #60171E);
-      border: 1px solid #8a2530;
-      color: #ffffff;
-      display: grid;
-      gap: 14px;
-      box-shadow: var(--shadow);
-    }
+
+/* ==========================================================================
+   CARTEIRINHA OFICIAL - IGREJA EVANGÉLICA RESTAURAÇÃO (FRENTE E VERSO)
+   ========================================================================== */
+.ier-cards-stack {
+  display: grid;
+  gap: 16px;
+}
+
+.ier-card-face {
+  width: 100%;
+  max-width: 460px;
+  aspect-ratio: 502 / 319;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #ffffff !important;
+  border: 2px solid #be995d;
+  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.75);
+  display: grid;
+  grid-template-rows: 37.3% 2.4% 44.5% 2.4% 13.4%;
+  position: relative;
+  font-family: Arial, Helvetica, sans-serif;
+  user-select: none;
+  margin: 0 auto;
+}
+
+.ier-card-header {
+  background: #4a1018;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 10px;
+  position: relative;
+}
+
+.ier-card-header-title {
+  color: #ffffff;
+  font-size: clamp(11px, 2.4vw, 15px);
+  font-weight: 400;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  line-height: 1.1;
+  margin-bottom: 3px;
+}
+
+.ier-card-header-logo {
+  height: 70%;
+  max-height: 66px;
+  width: auto;
+  object-fit: contain;
+  display: block;
+}
+
+.ier-card-back .ier-card-header-logo {
+  height: 82%;
+  max-height: 76px;
+}
+
+.ier-card-gold-bar {
+  background: #be995d;
+  width: 100%;
+  height: 100%;
+}
+
+.ier-card-body-front {
+  background: #ffffff;
+  display: grid;
+  grid-template-columns: 28% 72%;
+  align-items: center;
+  padding: 6px 14px 10px 16px;
+  position: relative;
+  color: #4a1018;
+}
+
+.ier-card-photo-frame {
+  width: 100%;
+  max-width: 96px;
+  aspect-ratio: 48 / 58;
+  border: 3px solid #4a1018;
+  background: linear-gradient(180deg, #bde4ff 0%, #e6f5ff 62%, #b8dc6f 62%, #76a305 100%);
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+
+.ier-card-photo-frame img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.ier-card-fields {
+  display: grid;
+  gap: 2px;
+  padding-left: 8px;
+  font-size: clamp(10px, 2.1vw, 13px);
+  line-height: 1.18;
+  color: #4a1018;
+}
+
+.ier-card-field-row {
+  display: grid;
+  grid-template-columns: 86px minmax(0, 1fr);
+  gap: 5px;
+  align-items: baseline;
+}
+
+.ier-card-field-label {
+  text-align: right;
+  font-weight: 600;
+  color: #4a1018;
+  white-space: nowrap;
+}
+
+.ier-card-field-value {
+  text-align: left;
+  font-weight: 700;
+  color: #4a1018;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ier-card-valid-pill {
+  position: absolute;
+  left: 50%;
+  bottom: 11.5%;
+  transform: translateX(-50%);
+  background: #4a1018;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: clamp(9px, 1.8vw, 11.5px);
+  padding: 3px 14px;
+  border-radius: 999px;
+  white-space: nowrap;
+  z-index: 3;
+  letter-spacing: 0.3px;
+}
+
+.ier-card-footer {
+  background: #4a1018;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: clamp(11px, 2.4vw, 15px);
+  letter-spacing: 0.3px;
+}
+
+.ier-card-body-back {
+  background: #ffffff;
+  color: #4a1018;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 6px 18px 6px;
+  text-align: center;
+}
+
+.ier-card-back-info {
+  display: grid;
+  gap: 1px;
+  font-weight: 700;
+  font-size: clamp(10px, 2.1vw, 13px);
+  line-height: 1.22;
+  color: #4a1018;
+}
+
+.ier-card-signatures {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  padding: 0 10px;
+  margin-top: auto;
+}
+
+.ier-card-sig-box {
+  border-top: 1.5px solid #4a1018;
+  padding-top: 2px;
+  font-size: clamp(9.5px, 2vw, 12px);
+  color: #4a1018;
+}
+
     .radio-popup-widget {
       position: fixed;
       right: 18px;
@@ -2768,11 +2948,373 @@ function renderUsersRoleManager() {
   wireUserRoleSelects(pageContainer);
 }
 
-// Renderização da Página Meu Perfil + Carteira Digital + Fichas da Secretaria/ADM
+// Renderização da Página Meu Perfil + Carteirinha Oficial IER (Frente e Verso) + Download PNG/PDF
+function getMemberCargoForCard(user) {
+  if (!user) return "Membro";
+  const mainRole = ROLE_LABELS[user.roleId] || user.role || "Membro";
+  const subs = getUserSubRoleList(user);
+  if (!subs.length) return mainRole;
+  return `${mainRole} (${subs.map((k) => SUBROLE_LABELS[k]).join(", ")})`;
+}
+
+function getCardHeaderLogoSrc() {
+  return appState.churchLogo || IER_CARD_LOGO_DATA_URL || "logo.png";
+}
+
+function buildIerCardHtml(user) {
+  const logoSrc = getCardHeaderLogoSrc();
+  const photoHtml = user?.photoUrl
+    ? `<img src="${user.photoUrl}" alt="${escapeHtml(user.name)}" />`
+    : `<div style="width:100%; height:100%; display:grid; place-items:center; color:#4a1018; font-weight:800; font-size:11px; text-align:center; padding:4px;">FOTO<br/>3x4</div>`;
+
+  const nomeVal = user?.name || "Não preenchido";
+  const cpfVal = user?.cpf || "___.___.___-__";
+  const cargoVal = getMemberCargoForCard(user);
+  const membrouVal = formatDate(user?.baptismDate) || "__/__/____";
+  const estadoVal = user?.maritalStatus || "SP";
+  const validadeVal = user?.cardValidUntil || "31/12/2026";
+
+  return `
+    <div class="ier-cards-stack">
+      <!-- FRENTE DA CARTEIRINHA -->
+      <div>
+        <small style="display:block; margin-bottom:6px; color:var(--muted); font-weight:700;">Frente da Carteirinha (Preenchimento Automático):</small>
+        <div class="ier-card-face ier-card-front">
+          <div class="ier-card-header">
+            <div class="ier-card-header-title">MEMBRO ATIVO</div>
+            <img class="ier-card-header-logo" src="${logoSrc}" alt="Igreja Evangélica Restauração" />
+          </div>
+          <div class="ier-card-gold-bar"></div>
+          <div class="ier-card-body-front">
+            <div class="ier-card-photo-frame">${photoHtml}</div>
+            <div class="ier-card-fields">
+              <div class="ier-card-field-row">
+                <span class="ier-card-field-label">NOME:</span>
+                <span class="ier-card-field-value" id="card-live-name">${escapeHtml(nomeVal)}</span>
+              </div>
+              <div class="ier-card-field-row">
+                <span class="ier-card-field-label">CPF:</span>
+                <span class="ier-card-field-value" id="card-live-cpf">${escapeHtml(cpfVal)}</span>
+              </div>
+              <div class="ier-card-field-row">
+                <span class="ier-card-field-label">CARGO:</span>
+                <span class="ier-card-field-value" id="card-live-cargo">${escapeHtml(cargoVal)}</span>
+              </div>
+              <div class="ier-card-field-row">
+                <span class="ier-card-field-label">MEMBROU:</span>
+                <span class="ier-card-field-value" id="card-live-membrou">${escapeHtml(membrouVal)}</span>
+              </div>
+              <div class="ier-card-field-row">
+                <span class="ier-card-field-label">ESTADO:</span>
+                <span class="ier-card-field-value" id="card-live-estado">${escapeHtml(estadoVal)}</span>
+              </div>
+            </div>
+          </div>
+          <div class="ier-card-valid-pill">VÁLIDO ATÉ: ${escapeHtml(validadeVal)}</div>
+          <div class="ier-card-gold-bar"></div>
+          <div class="ier-card-footer">www.ierestauracao.com.br</div>
+        </div>
+      </div>
+
+      <!-- VERSO DA CARTEIRINHA -->
+      <div>
+        <small style="display:block; margin-bottom:6px; color:var(--muted); font-weight:700;">Verso da Carteirinha:</small>
+        <div class="ier-card-face ier-card-back">
+          <div class="ier-card-header">
+            <img class="ier-card-header-logo" src="${logoSrc}" alt="Igreja Evangélica Restauração" />
+          </div>
+          <div class="ier-card-gold-bar"></div>
+          <div class="ier-card-body-back">
+            <div class="ier-card-back-info">
+              <div>SEDE</div>
+              <div>Avenida Mário Trevenzolli, 1199</div>
+              <div>Campinas / SP</div>
+              <div>CNPJ: 02.116.066/0001-77</div>
+            </div>
+            <div class="ier-card-signatures">
+              <div class="ier-card-sig-box">Presidente</div>
+              <div class="ier-card-sig-box">Secretária</div>
+            </div>
+          </div>
+          <div class="ier-card-gold-bar"></div>
+          <div class="ier-card-footer"></div>
+        </div>
+      </div>
+
+      <!-- BOTÕES DE DOWNLOAD DIRETO -->
+      <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:4px;">
+        <button type="button" class="primary-button" id="download-my-card-png-btn" style="flex:1;">
+          📥 Baixar Carteirinha (PNG)
+        </button>
+        <button type="button" class="secondary-button" id="download-my-card-pdf-btn" style="flex:1;">
+          🖨️ Baixar / Imprimir em PDF
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+function loadImageElement(src) {
+  return new Promise((resolve) => {
+    if (!src) {
+      resolve(null);
+      return;
+    }
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
+}
+
+function drawRoundedRectPath(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+async function renderMemberCardToCanvas(user) {
+  const W = 1004;
+  const H = 638;
+  const GAP = 44;
+  const canvas = document.createElement("canvas");
+  canvas.width = W;
+  canvas.height = H * 2 + GAP;
+  const ctx = canvas.getContext("2d");
+
+  const logoImg = await loadImageElement(getCardHeaderLogoSrc());
+  const photoImg = await loadImageElement(user?.photoUrl || "");
+
+  const drawCardBase = (offsetY, isFront) => {
+    ctx.save();
+    drawRoundedRectPath(ctx, 0, offsetY, W, H, 28);
+    ctx.clip();
+
+    // Fundo branco geral
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, offsetY, W, H);
+
+    // Topo Vinho (#4a1018)
+    ctx.fillStyle = "#4a1018";
+    ctx.fillRect(0, offsetY, W, 238);
+
+    // Faixa Dourada Superior (#be995d)
+    ctx.fillStyle = "#be995d";
+    ctx.fillRect(0, offsetY + 238, W, 16);
+
+    // Faixa Dourada Inferior (#be995d)
+    ctx.fillStyle = "#be995d";
+    ctx.fillRect(0, offsetY + 538, W, 16);
+
+    // Rodapé Vinho (#4a1018)
+    ctx.fillStyle = "#4a1018";
+    ctx.fillRect(0, offsetY + 554, W, 84);
+
+    if (isFront) {
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "400 31px Arial, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("MEMBRO ATIVO", W / 2, offsetY + 46);
+    }
+
+    if (logoImg) {
+      const targetH = isFront ? 152 : 182;
+      const ratio = logoImg.width / Math.max(1, logoImg.height);
+      const targetW = targetH * ratio;
+      const logoY = isFront ? offsetY + 64 : offsetY + 30;
+      ctx.drawImage(logoImg, (W - targetW) / 2, logoY, targetW, targetH);
+    } else {
+      ctx.fillStyle = "#f3d285";
+      ctx.font = "bold 34px Arial, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("Igreja Evangélica Restauração", W / 2, offsetY + (isFront ? 148 : 130));
+    }
+
+    ctx.restore();
+  };
+
+  // 1. DESENHA A FRENTE
+  drawCardBase(0, true);
+
+  // Moldura 3x4 da Foto
+  const pX = 52;
+  const pY = 276;
+  const pW = 198;
+  const pH = 238;
+  if (photoImg) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(pX, pY, pW, pH);
+    ctx.clip();
+    const imgRatio = photoImg.width / Math.max(1, photoImg.height);
+    const boxRatio = pW / pH;
+    let dW = pW, dH = pH, dX = pX, dY = pY;
+    if (imgRatio > boxRatio) {
+      dW = pH * imgRatio;
+      dX = pX - (dW - pW) / 2;
+    } else {
+      dH = pW / imgRatio;
+      dY = pY - (dH - pH) / 2;
+    }
+    ctx.drawImage(photoImg, dX, dY, dW, dH);
+    ctx.restore();
+  } else {
+    ctx.fillStyle = "#d9f0ff";
+    ctx.fillRect(pX, pY, pW, pH * 0.65);
+    ctx.fillStyle = "#76a305";
+    ctx.fillRect(pX, pY + pH * 0.65, pW, pH * 0.35);
+  }
+  ctx.lineWidth = 6;
+  ctx.strokeStyle = "#4a1018";
+  ctx.strokeRect(pX, pY, pW, pH);
+
+  // Campos da Frente
+  const rows = [
+    ["NOME:", user?.name || ""],
+    ["CPF:", user?.cpf || ""],
+    ["CARGO:", getMemberCargoForCard(user)],
+    ["MEMBROU:", formatDate(user?.baptismDate) || ""],
+    ["ESTADO:", user?.maritalStatus || "SP"],
+  ];
+  let startY = 334;
+  rows.forEach(([label, val]) => {
+    ctx.fillStyle = "#4a1018";
+    ctx.font = "600 28px Arial, sans-serif";
+    ctx.textAlign = "right";
+    ctx.fillText(label, 522, startY);
+
+    ctx.font = "bold 28px Arial, sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillText(String(val || ""), 536, startY, 440);
+    startY += 35;
+  });
+
+  // Pílula VÁLIDO ATÉ: 31/12/2026
+  const pillW = 364;
+  const pillH = 46;
+  const pillX = (W - pillW) / 2;
+  const pillY = 518;
+  ctx.fillStyle = "#4a1018";
+  drawRoundedRectPath(ctx, pillX, pillY, pillW, pillH, 23);
+  ctx.fill();
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "bold 24px Arial, sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText(`VÁLIDO ATÉ: ${user?.cardValidUntil || "31/12/2026"}`, W / 2, pillY + 31);
+
+  // Site no rodapé da frente
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "bold 33px Arial, sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("www.ierestauracao.com.br", W / 2, 608);
+
+  // 2. DESENHA O VERSO
+  const backY = H + GAP;
+  drawCardBase(backY, false);
+
+  ctx.fillStyle = "#4a1018";
+  ctx.textAlign = "center";
+  ctx.font = "bold 26px Arial, sans-serif";
+  ctx.fillText("SEDE", W / 2, backY + 286);
+  ctx.fillText("Avenida Mário Trevenzolli, 1199", W / 2, backY + 320);
+  ctx.fillText("Campinas / SP", W / 2, backY + 354);
+  ctx.font = "bold 28px Arial, sans-serif";
+  ctx.fillText("CNPJ: 02.116.066/0001-77", W / 2, backY + 390);
+
+  // Assinaturas Presidente e Secretária
+  ctx.strokeStyle = "#4a1018";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(104, backY + 498);
+  ctx.lineTo(420, backY + 498);
+  ctx.moveTo(590, backY + 498);
+  ctx.lineTo(906, backY + 498);
+  ctx.stroke();
+
+  ctx.font = "400 26px Arial, sans-serif";
+  ctx.fillText("Presidente", 262, backY + 526);
+  ctx.fillText("Secretária", 748, backY + 526);
+
+  return canvas;
+}
+
+async function downloadMemberCardPng(targetUser = currentUser) {
+  if (!targetUser) return;
+  const canvas = await renderMemberCardToCanvas(targetUser);
+  const dataUrl = canvas.toDataURL("image/png");
+  const link = document.createElement("a");
+  const safeName = slugifyKey(targetUser.name || "membro");
+  link.download = `Carteirinha_IER_${safeName}.png`;
+  link.href = dataUrl;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
+
+async function printOrSaveMemberCardPdf(targetUser = currentUser) {
+  if (!targetUser) return;
+  const canvas = await renderMemberCardToCanvas(targetUser);
+  const dataUrl = canvas.toDataURL("image/png");
+  const win = window.open("", "_blank");
+  if (!win) {
+    alert("Permita popups para abrir a versão em PDF para impressão.");
+    return;
+  }
+  win.document.write(`
+    <!DOCTYPE html>
+    <html lang="pt-BR">
+    <head>
+      <meta charset="utf-8" />
+      <title>Carteirinha de Membro - ${escapeHtml(targetUser.name)}</title>
+      <style>
+        body { margin: 0; padding: 24px; background: #f4f4f4; font-family: Arial, sans-serif; text-align: center; }
+        .no-print { margin-bottom: 18px; }
+        .btn { padding: 10px 18px; background: #60171E; color: #fff; border: 0; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 14px; }
+        img { width: 85.6mm; max-width: 100%; height: auto; box-shadow: 0 6px 20px rgba(0,0,0,0.25); border-radius: 8px; }
+        @media print {
+          body { background: #fff; padding: 0; }
+          .no-print { display: none; }
+          img { width: 85.6mm; box-shadow: none; }
+        }
+      </style>
+    </head>
+    <body>
+      <div class="no-print">
+        <button class="btn" onclick="window.print()">🖨️ Imprimir ou Salvar como PDF</button>
+      </div>
+      <img src="${dataUrl}" alt="Carteirinha Frente e Verso" onload="setTimeout(() => window.print(), 350)" />
+    </body>
+    </html>
+  `);
+  win.document.close();
+}
+
 function renderProfilePage() {
   if (!currentUser) return;
   const form = document.querySelector("#profile-form");
   if (form) {
+    if (!form.querySelector("#prof-estado")) {
+      const grid = form.querySelector(".form-grid");
+      if (grid) {
+        grid.insertAdjacentHTML(
+          "beforeend",
+          `<label>
+            Estado / Estado Civil (Campo ESTADO da Carteirinha)
+            <input id="prof-estado" name="maritalStatus" type="text" placeholder="Ex: Casado(a) / Solteiro(a) / SP" />
+          </label>`
+        );
+      }
+    }
+
     const fields = {
       "#prof-name": currentUser.name,
       "#prof-member-card": currentUser.memberCard,
@@ -2780,49 +3322,55 @@ function renderProfilePage() {
       "#prof-birth": currentUser.birthDate,
       "#prof-phone": currentUser.phone,
       "#prof-baptism": currentUser.baptismDate,
+      "#prof-estado": currentUser.maritalStatus || "SP",
       "#prof-address": currentUser.address,
     };
     Object.entries(fields).forEach(([sel, val]) => {
       const input = document.querySelector(sel);
       if (input && document.activeElement !== input) input.value = val || "";
     });
+
+    if (!form.dataset.liveCardWired) {
+      form.dataset.liveCardWired = "true";
+      form.addEventListener("input", () => {
+        const liveName = document.querySelector("#prof-name")?.value || currentUser.name;
+        const liveCpf = document.querySelector("#prof-cpf")?.value || currentUser.cpf;
+        const liveBaptism = document.querySelector("#prof-baptism")?.value || currentUser.baptismDate;
+        const liveEstado = document.querySelector("#prof-estado")?.value || currentUser.maritalStatus || "SP";
+
+        const nameEl = document.querySelector("#card-live-name");
+        const cpfEl = document.querySelector("#card-live-cpf");
+        const membrouEl = document.querySelector("#card-live-membrou");
+        const estadoEl = document.querySelector("#card-live-estado");
+        if (nameEl) nameEl.textContent = liveName || "Não preenchido";
+        if (cpfEl) cpfEl.textContent = liveCpf || "___.___.___-__";
+        if (membrouEl) membrouEl.textContent = formatDate(liveBaptism) || "__/__/____";
+        if (estadoEl) estadoEl.textContent = liveEstado || "SP";
+      });
+    }
   }
 
   const cardPreview = document.querySelector("#member-card-preview");
   if (cardPreview) {
-    const subRoleText = getUserSubRolesText(currentUser);
-
-    cardPreview.innerHTML = `
-      <div class="member-badge-card">
-        <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid rgba(255,255,255,0.18); padding-bottom: 12px;">
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <div class="brand-mark" style="width: 38px; height: 38px; flex-basis: 38px;">${getLogoHtml()}</div>
-            <div>
-              <strong style="display: block; font-size: 14px;">${escapeHtml(currentUser.church)}</strong>
-              <small style="opacity: 0.8;">${escapeHtml(currentUser.pastor)}</small>
-            </div>
-          </div>
-          <span class="tag" style="background: #60171E; color: #ffffff; border: 1px solid #ffffff;">${escapeHtml(currentUser.memberCard || "IGR-0001")}</span>
-        </div>
-
-        <div style="display: flex; align-items: center; gap: 14px;">
-          ${getAvatarHtml(currentUser, 68)}
-          <div>
-            <strong style="font-size: 18px; display: block;">${escapeHtml(currentUser.name)}</strong>
-            <span style="display: inline-block; margin-top: 4px; padding: 3px 8px; border-radius: 6px; background: rgba(255,255,255,0.15); font-size: 12px; font-weight: 800;">
-              ${escapeHtml(ROLE_LABELS[currentUser.roleId] || currentUser.role)} • ${escapeHtml(subRoleText)}
-            </span>
-          </div>
-        </div>
-
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 12px; background: rgba(0,0,0,0.18); padding: 10px; border-radius: 8px;">
-          <div><span style="opacity:0.75;">Aniversário:</span><br/><strong>${escapeHtml(formatDate(currentUser.birthDate) || "Não informado")}</strong></div>
-          <div><span style="opacity:0.75;">Batismo/Membro:</span><br/><strong>${escapeHtml(formatDate(currentUser.baptismDate) || "Não informado")}</strong></div>
-          <div><span style="opacity:0.75;">CPF (Restrito):</span><br/><strong>${escapeHtml(currentUser.cpf || "Não informado")}</strong></div>
-          <div><span style="opacity:0.75;">WhatsApp:</span><br/><strong>${escapeHtml(currentUser.phone || "Não informado")}</strong></div>
-        </div>
-      </div>
-    `;
+    cardPreview.innerHTML = buildIerCardHtml(currentUser);
+    cardPreview.querySelector("#download-my-card-png-btn")?.addEventListener("click", () => {
+      downloadMemberCardPng({
+        ...currentUser,
+        name: document.querySelector("#prof-name")?.value || currentUser.name,
+        cpf: document.querySelector("#prof-cpf")?.value || currentUser.cpf,
+        baptismDate: document.querySelector("#prof-baptism")?.value || currentUser.baptismDate,
+        maritalStatus: document.querySelector("#prof-estado")?.value || currentUser.maritalStatus || "SP",
+      });
+    });
+    cardPreview.querySelector("#download-my-card-pdf-btn")?.addEventListener("click", () => {
+      printOrSaveMemberCardPdf({
+        ...currentUser,
+        name: document.querySelector("#prof-name")?.value || currentUser.name,
+        cpf: document.querySelector("#prof-cpf")?.value || currentUser.cpf,
+        baptismDate: document.querySelector("#prof-baptism")?.value || currentUser.baptismDate,
+        maritalStatus: document.querySelector("#prof-estado")?.value || currentUser.maritalStatus || "SP",
+      });
+    });
   }
 
   const secPanel = document.querySelector("#secretaria-members-panel");
@@ -2867,11 +3415,20 @@ function renderProfilePage() {
                     <small style="color: var(--muted);">E-mail: ${escapeHtml(u.login)} | WhatsApp: ${escapeHtml(u.phone || "Não informado")}</small>
                   </div>
                 </div>
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                  <button type="button" class="primary-button sec-download-png-btn" data-user-id="${escapeHtml(u.id)}" style="min-height:32px; padding:6px 10px; font-size:12px;">
+                    📥 Baixar Carteirinha (PNG)
+                  </button>
+                  <button type="button" class="secondary-button sec-download-pdf-btn" data-user-id="${escapeHtml(u.id)}" style="min-height:32px; padding:6px 10px; font-size:12px;">
+                    🖨️ PDF Carteirinha
+                  </button>
+                </div>
               </div>
               <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-top: 10px; padding: 10px; background: #080808; color: #ffffff; border-radius: 6px; font-size: 13px;">
                 <div><strong>CPF:</strong> ${escapeHtml(u.cpf || "Não preenchido")}</div>
                 <div><strong>Aniversário:</strong> ${escapeHtml(formatDate(u.birthDate) || "Não preenchido")}</div>
-                <div><strong>Batismo:</strong> ${escapeHtml(formatDate(u.baptismDate) || "Não preenchido")}</div>
+                <div><strong>Membrou/Batismo:</strong> ${escapeHtml(formatDate(u.baptismDate) || "Não preenchido")}</div>
+                <div><strong>Estado:</strong> ${escapeHtml(u.maritalStatus || "SP")}</div>
                 <div style="grid-column: 1 / -1;"><strong>Endereço Residencial:</strong> ${escapeHtml(u.address || "Não preenchido")}</div>
               </div>
             </article>
@@ -2879,6 +3436,20 @@ function renderProfilePage() {
         })
         .join("")
     : emptyCard("Nenhum membro encontrado para esta busca.");
+
+  secList.querySelectorAll(".sec-download-png-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const target = appState.users.find((u) => u.id === btn.dataset.userId);
+      if (target) downloadMemberCardPng(target);
+    });
+  });
+
+  secList.querySelectorAll(".sec-download-pdf-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const target = appState.users.find((u) => u.id === btn.dataset.userId);
+      if (target) printOrSaveMemberCardPdf(target);
+    });
+  });
 }
 
 // Renderização da Rádio Ao Vivo Multi-Locutores (Sincroniza tanto a página quanto o Popup Flutuante)
@@ -4722,6 +5293,7 @@ function wirePageContentEvents() {
     currentUser.birthDate = String(form.get("birthDate") || "");
     currentUser.phone = String(form.get("phone") || "").trim();
     currentUser.baptismDate = String(form.get("baptismDate") || "");
+    currentUser.maritalStatus = String(form.get("maritalStatus") || "SP").trim();
     currentUser.address = String(form.get("address") || "").trim();
 
     await saveAppState();

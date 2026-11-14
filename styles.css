@@ -1183,3 +1183,188 @@ textarea {
     flex-direction: column-reverse;
   }
 }
+
+/* ==========================================================================
+   CARTEIRINHA OFICIAL - IGREJA EVANGÉLICA RESTAURAÇÃO (FRENTE E VERSO)
+   ========================================================================== */
+.ier-cards-stack {
+  display: grid;
+  gap: 16px;
+}
+
+.ier-card-face {
+  width: 100%;
+  max-width: 460px;
+  aspect-ratio: 502 / 319;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #ffffff !important;
+  border: 2px solid #be995d;
+  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.75);
+  display: grid;
+  grid-template-rows: 37.3% 2.4% 44.5% 2.4% 13.4%;
+  position: relative;
+  font-family: Arial, Helvetica, sans-serif;
+  user-select: none;
+  margin: 0 auto;
+}
+
+.ier-card-header {
+  background: #4a1018;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 10px;
+  position: relative;
+}
+
+.ier-card-header-title {
+  color: #ffffff;
+  font-size: clamp(11px, 2.4vw, 15px);
+  font-weight: 400;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  line-height: 1.1;
+  margin-bottom: 3px;
+}
+
+.ier-card-header-logo {
+  height: 70%;
+  max-height: 66px;
+  width: auto;
+  object-fit: contain;
+  display: block;
+}
+
+.ier-card-back .ier-card-header-logo {
+  height: 82%;
+  max-height: 76px;
+}
+
+.ier-card-gold-bar {
+  background: #be995d;
+  width: 100%;
+  height: 100%;
+}
+
+.ier-card-body-front {
+  background: #ffffff;
+  display: grid;
+  grid-template-columns: 28% 72%;
+  align-items: center;
+  padding: 6px 14px 10px 16px;
+  position: relative;
+  color: #4a1018;
+}
+
+.ier-card-photo-frame {
+  width: 100%;
+  max-width: 96px;
+  aspect-ratio: 48 / 58;
+  border: 3px solid #4a1018;
+  background: linear-gradient(180deg, #bde4ff 0%, #e6f5ff 62%, #b8dc6f 62%, #76a305 100%);
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+
+.ier-card-photo-frame img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.ier-card-fields {
+  display: grid;
+  gap: 2px;
+  padding-left: 8px;
+  font-size: clamp(10px, 2.1vw, 13px);
+  line-height: 1.18;
+  color: #4a1018;
+}
+
+.ier-card-field-row {
+  display: grid;
+  grid-template-columns: 86px minmax(0, 1fr);
+  gap: 5px;
+  align-items: baseline;
+}
+
+.ier-card-field-label {
+  text-align: right;
+  font-weight: 600;
+  color: #4a1018;
+  white-space: nowrap;
+}
+
+.ier-card-field-value {
+  text-align: left;
+  font-weight: 700;
+  color: #4a1018;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ier-card-valid-pill {
+  position: absolute;
+  left: 50%;
+  bottom: 11.5%;
+  transform: translateX(-50%);
+  background: #4a1018;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: clamp(9px, 1.8vw, 11.5px);
+  padding: 3px 14px;
+  border-radius: 999px;
+  white-space: nowrap;
+  z-index: 3;
+  letter-spacing: 0.3px;
+}
+
+.ier-card-footer {
+  background: #4a1018;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: clamp(11px, 2.4vw, 15px);
+  letter-spacing: 0.3px;
+}
+
+.ier-card-body-back {
+  background: #ffffff;
+  color: #4a1018;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 6px 18px 6px;
+  text-align: center;
+}
+
+.ier-card-back-info {
+  display: grid;
+  gap: 1px;
+  font-weight: 700;
+  font-size: clamp(10px, 2.1vw, 13px);
+  line-height: 1.22;
+  color: #4a1018;
+}
+
+.ier-card-signatures {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  padding: 0 10px;
+  margin-top: auto;
+}
+
+.ier-card-sig-box {
+  border-top: 1.5px solid #4a1018;
+  padding-top: 2px;
+  font-size: clamp(9.5px, 2vw, 12px);
+  color: #4a1018;
+}
