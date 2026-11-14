@@ -96,14 +96,19 @@ const MONTHS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun"];
 let appState = loadAppState();
 let currentUser = null;
 
-// Variáveis de controle da Rádio Ao Vivo (Anti-Eco)
+// Variáveis de controle da Rádio Ao Vivo Multi-Locutores (Somente Saída do Mic / Zero Alto-Falante)
 let micStream = null;
 let micRecorderInterval = null;
 let isBroadcastingMic = false;
+let isMicPausedForListening = false;
+let isHeadsetCoHostMode = false;
 let isListeningRadio = false;
 let radioListenerInterval = null;
 let currentPlayingAudio = null;
 let lastPlayedChunkId = 0;
+let lastPlayedChunkByDevice = {};
+let audioPlaybackQueue = [];
+let isPlayingQueueItem = false;
 
 function emptyState() {
   return {
@@ -125,9 +130,23 @@ function emptyState() {
       speakerChurch: "",
       streamUrl: "",
       updatedAt: 0,
+      speakers: {},
     },
     radioMessages: [],
   };
+}
+
+function getActiveRadioSpeakers(liveObj = appState.radioLive) {
+  if (!liveObj || typeof liveObj !== "object") return [];
+  const rawSpeakers = liveObj.speakers && typeof liveObj.speakers === "object" ? Object.values(liveObj.speakers) : [];
+  const now = Date.now();
+  // Mantém locutores que enviaram sinal recentemente (últimos 60 segundos) ou que estão ativos
+  const activeList = rawSpeakers.filter((sp) => sp && sp.name && (!sp.lastActiveAt || now - Number(sp.lastActiveAt) < 60000));
+  if (activeList.length > 0) return activeList;
+  if (liveObj.active && liveObj.speakerName) {
+    return [{ deviceId: "legacy", userId: "", name: liveObj.speakerName, church: liveObj.speakerChurch || "" }];
+  }
+  return [];
 }
 
 function refreshDynamicCatalogs(stateObj = appState) {
@@ -355,6 +374,7 @@ async function resetEntireDatabase() {
         fetch(getCloudEndpoint("appigreja_state"), { method: "DELETE" }),
         fetch(getCloudEndpoint("appigreja_radio_chat"), { method: "DELETE" }),
         fetch(getCloudEndpoint("appigreja_radio_chunk"), { method: "DELETE" }),
+        fetch(getCloudEndpoint("appigreja_radio_chunks"), { method: "DELETE" }),
       ]);
     } catch (err) {
       console.warn("Erro ao limpar nuvem:", err);
@@ -1557,27 +1577,35 @@ function injectRadioPopupWidget() {
           <audio id="popup-external-audio-player" controls style="width:100%; display:none;"></audio>
         </div>
 
-        <!-- Estúdio de Transmissão (Visível para ADM ou quem tem permissão de Rádio) -->
+        <!-- Estúdio de Transmissão Multi-Locutores (Microfone Somente Envio / Alto-Falante Cortado) -->
         <div id="popup-radio-broadcaster-studio" style="padding:12px; border:2px solid #60171E; border-radius:10px; background:#120406; color:#ffffff; display:none;">
-          <p class="eyebrow" style="margin-bottom:6px;">🎙️ Estúdio do Locutor (Somente Entrada / Sem Eco)</p>
+          <p class="eyebrow" style="margin-bottom:4px;">🎙️ Bancada Ao Vivo Multi-Locutores (Alto-Falante Cortado = Zero Eco)</p>
+          <div id="popup-active-speakers-pills" class="tag-row" style="margin-bottom:8px;"></div>
           <div class="stack-form" style="gap:10px;">
             <label style="font-size:12px;">
-              Título da Transmissão
+              Título da Transmissão / Bancada
               <input id="popup-broadcast-title" type="text" value="Palavra Pastoral e Oração Ao Vivo" style="min-height:34px; padding:6px 8px;" />
             </label>
             <label style="font-size:12px;">
               Link de Stream Externo (Opcional)
               <input id="popup-broadcast-stream-url" type="url" placeholder="https://... (deixe vazio p/ usar Microfone)" style="min-height:34px; padding:6px 8px;" />
             </label>
-            <div style="display:flex; gap:8px; flex-wrap:wrap;">
-              <button class="primary-button" type="button" id="popup-start-mic-btn" style="flex:1; min-height:36px; font-size:13px;">
-                🎙️ Entrar Ao Vivo
+            <div style="display:flex; gap:6px; flex-wrap:wrap;">
+              <button class="primary-button" type="button" id="popup-start-mic-btn" style="flex:1; min-height:36px; font-size:12px;">
+                🎙️ Entrar na Bancada (Só Mic)
               </button>
-              <button class="secondary-button danger-btn" type="button" id="popup-stop-broadcast-btn" style="display:none; flex:1; min-height:36px;">
-                ⏹️ Encerrar
+              <button class="secondary-button" type="button" id="popup-pause-mic-btn" style="display:none; flex:1; min-height:36px; font-size:12px; border-color:#f3b743; color:#f3b743;">
+                ⏸️ Pausar Mic p/ Ouvir Bancada
+              </button>
+              <button class="secondary-button danger-btn" type="button" id="popup-stop-broadcast-btn" style="display:none; min-height:36px; font-size:12px;">
+                ⏹️ Sair da Bancada
               </button>
             </div>
-            <small id="popup-broadcaster-feedback" style="color:var(--green-dark); font-weight:700; font-size:12px;"></small>
+            <label style="display:flex; align-items:center; gap:6px; font-size:11px; color:var(--muted); cursor:pointer;">
+              <input type="checkbox" id="popup-headset-mode-check" style="min-height:16px; width:16px;" />
+              🎧 Estou de Fone de Ouvido (ouvir outros co-locutores sem cortar meu mic; minha própria voz nunca sai no som)
+            </label>
+            <small id="popup-broadcaster-feedback" style="color:#ffffff; font-weight:700; font-size:12px;"></small>
           </div>
         </div>
 
@@ -1608,7 +1636,18 @@ function injectRadioPopupWidget() {
 
   document.querySelector("#popup-listen-radio-btn")?.addEventListener("click", startListeningRadioLoop);
   document.querySelector("#popup-start-mic-btn")?.addEventListener("click", startMicrophoneBroadcast);
+  document.querySelector("#popup-pause-mic-btn")?.addEventListener("click", togglePauseBroadcasterMic);
   document.querySelector("#popup-stop-broadcast-btn")?.addEventListener("click", stopBroadcast);
+  document.querySelector("#popup-headset-mode-check")?.addEventListener("change", (e) => {
+    isHeadsetCoHostMode = Boolean(e.target.checked);
+    if (isHeadsetCoHostMode) {
+      ensureCoHostListenerLoop();
+      setRadioButtonsAndStatus(null, null, null, "🎧 Modo Fone Ativo: você ouvirá os outros locutores da bancada (sua própria voz continua 100% bloqueada no seu som).");
+    } else {
+      muteAllLocalAudioOutput();
+      setRadioButtonsAndStatus(null, null, null, "🔇 Modo Alto-Falante Cortado: seu aparelho apenas envia sua voz pelo microfone (Zero Eco).");
+    }
+  });
 
   document.querySelector("#popup-detach-window-btn")?.addEventListener("click", () => {
     window.open("radio.html?popup=1", "AppIgrejaRadioPopup", "width=450,height=720,menubar=no,toolbar=no,location=no,status=no");
@@ -2842,10 +2881,36 @@ function renderProfilePage() {
     : emptyCard("Nenhum membro encontrado para esta busca.");
 }
 
-// Renderização da Rádio Ao Vivo (Sincroniza tanto a página quanto o Popup Flutuante)
+// Renderização da Rádio Ao Vivo Multi-Locutores (Sincroniza tanto a página quanto o Popup Flutuante)
 function renderRadioPage() {
   const live = appState.radioLive || { active: false };
+  const activeSpeakers = getActiveRadioSpeakers(live);
+  const isActuallyLive = Boolean((live.active && activeSpeakers.length > 0) || isBroadcastingMic);
   const canBroadcast = canBroadcastRadio();
+
+  const speakersNamesText = activeSpeakers.length
+    ? activeSpeakers.map((s) => s.name).join(" • ")
+    : live.speakerName || "Locutor";
+
+  const speakersChurchesText = activeSpeakers.length
+    ? activeSpeakers.map((s) => `${s.name} (${s.church || "Igreja"})`).join(" | ")
+    : live.speakerChurch || "";
+
+  // Atualiza pílulas de locutores ativos na bancada
+  const pillsContainer = document.querySelector("#popup-active-speakers-pills");
+  if (pillsContainer) {
+    pillsContainer.innerHTML = activeSpeakers.length
+      ? activeSpeakers
+          .map(
+            (sp) => `
+            <span class="tag" style="background:#60171E; border-color:#ffffff;">
+              🎙️ ${escapeHtml(sp.name)} <small style="opacity:0.8; margin-left:4px;">(${escapeHtml(sp.church || "")})</small>
+            </span>
+          `
+          )
+          .join("")
+      : `<span class="status-pill">Bancada livre — você e outros líderes autorizados podem entrar juntos ao vivo</span>`;
+  }
 
   // Atualiza barra minimizada do Popup
   const miniBar = document.querySelector("#radio-mini-bar");
@@ -2854,27 +2919,31 @@ function renderRadioPage() {
   const miniListenBtn = document.querySelector("#popup-mini-listen-btn");
 
   if (miniBar) {
-    miniBar.classList.toggle("is-live", Boolean(live.active || isBroadcastingMic));
+    miniBar.classList.toggle("is-live", isActuallyLive);
   }
   if (miniTitle) {
     miniTitle.textContent = isBroadcastingMic
-      ? "🎙️ Você está Ao Vivo!"
-      : live.active
+      ? isMicPausedForListening
+        ? "⏸️ Mic Pausado (Ouvindo Bancada)"
+        : `🎙️ No Ar (${activeSpeakers.length || 1} na bancada)`
+      : isActuallyLive
         ? `🔴 ${live.title || "Rádio Ao Vivo"}`
         : "📻 Rádio Ao Vivo";
   }
   if (miniSub) {
     miniSub.textContent = isBroadcastingMic
-      ? "Microfone transmitindo em 2º plano"
-      : live.active
-        ? `No ar: ${live.speakerName}`
+      ? isMicPausedForListening
+        ? "Seu mic está fechado para ouvir o outro locutor"
+        : "Só saída de Mic ativa (Alto-falante cortado = Sem Eco)"
+      : isActuallyLive
+        ? `Na bancada (${activeSpeakers.length}): ${speakersNamesText}`
         : isListeningRadio
-          ? "Sintonizado (aguardando locutor)"
+          ? "Sintonizado (aguardando locutores)"
           : "Toque para abrir o popup";
   }
   if (miniListenBtn) {
-    if (isBroadcastingMic) {
-      miniListenBtn.textContent = "🔇 Locutor";
+    if (isBroadcastingMic && !isMicPausedForListening) {
+      miniListenBtn.textContent = "🔇 Só Mic";
       miniListenBtn.disabled = true;
     } else {
       miniListenBtn.disabled = false;
@@ -2892,8 +2961,10 @@ function renderRadioPage() {
   ["#radio-status-badge", "#popup-radio-status-badge"].forEach((sel) => {
     const badge = document.querySelector(sel);
     if (!badge) return;
-    badge.textContent = live.active ? "🔴 AO VIVO AGORA" : "Offline no momento";
-    badge.style.background = live.active ? "#60171E" : "#141414";
+    badge.textContent = isActuallyLive
+      ? `🔴 AO VIVO (${activeSpeakers.length || 1} Locutor${activeSpeakers.length > 1 ? "es" : ""})`
+      : "Offline no momento";
+    badge.style.background = isActuallyLive ? "#60171E" : "#141414";
     badge.style.color = "#ffffff";
   });
 
@@ -2901,42 +2972,52 @@ function renderRadioPage() {
   ["#radio-live-indicator", "#popup-radio-live-indicator"].forEach((sel) => {
     const indicator = document.querySelector(sel);
     if (!indicator) return;
-    indicator.style.background = live.active ? "#ef4444" : "#9ca3af";
-    indicator.style.boxShadow = live.active ? "0 0 12px #ef4444" : "none";
+    indicator.style.background = isActuallyLive ? "#ef4444" : "#9ca3af";
+    indicator.style.boxShadow = isActuallyLive ? "0 0 12px #ef4444" : "none";
   });
 
   const titleEl = document.querySelector("#radio-current-title");
   if (titleEl) {
-    titleEl.textContent = live.active ? live.title || "Transmissão Ao Vivo" : "Aguardando início da transmissão";
+    titleEl.textContent = isActuallyLive ? live.title || "Transmissão Ao Vivo" : "Aguardando início da transmissão";
   }
 
   ["#radio-speaker-name", "#popup-radio-speaker-name"].forEach((sel) => {
     const speakerEl = document.querySelector(sel);
     if (speakerEl) {
-      speakerEl.textContent = live.active ? `🎙️ No ar: ${live.speakerName}` : "Ninguém ao vivo no momento";
+      speakerEl.textContent = isActuallyLive
+        ? `🎙️ Na Bancada (${activeSpeakers.length || 1}): ${speakersNamesText}`
+        : "Ninguém ao vivo no momento";
     }
   });
 
   ["#radio-speaker-church", "#popup-radio-speaker-church"].forEach((sel) => {
     const churchEl = document.querySelector(sel);
     if (churchEl) {
-      churchEl.textContent = live.active
-        ? `${live.speakerChurch} — Continue navegando: o áudio não desliga!`
-        : "Você pode minimizar este popup e trocar de aba sem desligar a rádio.";
+      churchEl.textContent = isActuallyLive
+        ? `${speakersChurchesText} — Mais de uma pessoa pode participar ao vivo!`
+        : "Mais de um líder pode entrar na bancada ao vivo (o alto-falante de quem fala fica cortado para não dar eco).";
     }
   });
+
+  const pauseBtn = document.querySelector("#popup-pause-mic-btn");
+  if (pauseBtn) {
+    pauseBtn.style.display = isBroadcastingMic ? "inline-flex" : "none";
+    pauseBtn.textContent = isMicPausedForListening
+      ? "🎙️ Abrir Meu Mic p/ Falar"
+      : "⏸️ Pausar Mic p/ Ouvir Bancada";
+  }
 
   ["#stop-broadcast-btn", "#popup-stop-broadcast-btn"].forEach((sel) => {
     const stopBtn = document.querySelector(sel);
     if (stopBtn) {
-      stopBtn.style.display = (live.active || isBroadcastingMic) && canBroadcast ? "inline-flex" : "none";
+      stopBtn.style.display = (isActuallyLive || isBroadcastingMic) && canBroadcast ? "inline-flex" : "none";
     }
   });
 
   ["#external-audio-player", "#popup-external-audio-player"].forEach((sel) => {
     const extPlayer = document.querySelector(sel);
     if (!extPlayer) return;
-    if (live.active && live.streamUrl && !isBroadcastingMic) {
+    if (isActuallyLive && live.streamUrl && (!isBroadcastingMic || isMicPausedForListening)) {
       extPlayer.style.display = "block";
       if (extPlayer.src !== live.streamUrl) {
         extPlayer.src = live.streamUrl;
@@ -3028,7 +3109,6 @@ async function syncRadioChatAndStatus() {
       if (cloudState && typeof cloudState === "object") {
         const normalizedCloud = normalizeStateData(cloudState);
 
-        // Dispara notificações nativas no Celular / Área de Trabalho se houver novo Evento, Notificação ou Rádio Ao Vivo!
         await checkAndDispatchNewCloudAlerts(normalizedCloud);
 
         const liveSig = JSON.stringify(normalizedCloud.radioLive);
@@ -3148,7 +3228,6 @@ function startRealtimeRadioSyncLoop() {
   markCurrentItemsAsSeen();
   syncRadioChatAndStatus();
 
-  // Usa um Web Worker em 2º plano para o timer não congelar quando o usuário minimizar o app ou trocar de janela
   if (!backgroundSyncWorker && typeof Worker !== "undefined" && typeof Blob !== "undefined") {
     try {
       const workerBlob = new Blob(
@@ -3171,7 +3250,9 @@ function startRealtimeRadioSyncLoop() {
   radioChatSyncInterval = setInterval(syncRadioChatAndStatus, 3000);
 }
 
-// Transmissão Ao Vivo com trava Anti-Eco (Somente Entrada no aparelho locutor)
+// ============================================================================
+// MOTOR DE ÁUDIO MULTI-LOCUTORES (MICROFONE SÓ ENVIA / ALTO-FALANTE CORTADO = ZERO ECO)
+// ============================================================================
 function setRadioButtonsAndStatus(listenText, listenDisabled, statusText, feedbackText) {
   ["#listen-radio-btn", "#popup-listen-radio-btn"].forEach((sel) => {
     const btn = document.querySelector(sel);
@@ -3192,6 +3273,73 @@ function setRadioButtonsAndStatus(listenText, listenDisabled, statusText, feedba
   });
 }
 
+// Corta imediatamente qualquer som no alto-falante local para impedir microfonia/eco
+function muteAllLocalAudioOutput() {
+  audioPlaybackQueue = [];
+  isPlayingQueueItem = false;
+  if (currentPlayingAudio) {
+    try {
+      currentPlayingAudio.pause();
+      currentPlayingAudio.muted = true;
+      currentPlayingAudio.volume = 0;
+    } catch {}
+    currentPlayingAudio = null;
+  }
+  ["#external-audio-player", "#popup-external-audio-player"].forEach((sel) => {
+    const extPlayer = document.querySelector(sel);
+    if (extPlayer) {
+      extPlayer.pause();
+      extPlayer.muted = true;
+    }
+  });
+}
+
+// Se o navegador suportar setSinkId, direciona o áudio para fone/headset/auricular em vez do alto-falante aberto
+async function routeAudioToHeadsetIfAvailable(audioEl) {
+  if (!audioEl || typeof audioEl.setSinkId !== "function" || !navigator.mediaDevices?.enumerateDevices) {
+    return;
+  }
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const outputs = devices.filter((d) => d.kind === "audiooutput");
+    const headset = outputs.find((d) => /headphone|headset|earpiece|bluetooth|fone|usb/i.test(d.label || ""));
+    if (headset && headset.deviceId) {
+      await audioEl.setSinkId(headset.deviceId);
+    }
+  } catch {
+    // Segue saída padrão se o sistema não permitir troca de sink
+  }
+}
+
+async function registerSpeakerInBancada(title, streamUrl) {
+  await syncFromCloud();
+  const currentLive = appState.radioLive && typeof appState.radioLive === "object" ? appState.radioLive : {};
+  const speakers = currentLive.speakers && typeof currentLive.speakers === "object" ? { ...currentLive.speakers } : {};
+
+  speakers[DEVICE_INSTANCE_ID] = {
+    deviceId: DEVICE_INSTANCE_ID,
+    userId: currentUser.id,
+    name: currentUser.name,
+    church: `${currentUser.church} (${ROLE_LABELS[currentUser.roleId] || currentUser.role})`,
+    joinedAt: speakers[DEVICE_INSTANCE_ID]?.joinedAt || Date.now(),
+    lastActiveAt: Date.now(),
+  };
+
+  const activeNames = Object.values(speakers).map((s) => s.name).join(" • ");
+
+  appState.radioLive = {
+    active: true,
+    title: title || currentLive.title || "Palavra Pastoral Ao Vivo",
+    speakerName: activeNames || currentUser.name,
+    speakerChurch: `${currentUser.church} (${ROLE_LABELS[currentUser.roleId] || currentUser.role})`,
+    streamUrl: streamUrl || currentLive.streamUrl || "",
+    updatedAt: Date.now(),
+    speakers,
+  };
+  markCurrentItemsAsSeen();
+  await saveAppState();
+}
+
 async function startMicrophoneBroadcast() {
   if (!canBroadcastRadio()) return;
   const title =
@@ -3203,36 +3351,22 @@ async function startMicrophoneBroadcast() {
     document.querySelector("#broadcast-stream-url")?.value.trim() ||
     "";
 
-  // 1. Trava imediatamente qualquer saída de áudio neste aparelho (Modo Somente Entrada de Voz)
-  isListeningRadio = false;
+  // 1. Trava imediatamente a saída de alto-falante neste aparelho (Microfone Somente Envio = Zero Eco)
   isBroadcastingMic = true;
-  if (currentPlayingAudio) {
-    currentPlayingAudio.pause();
-    currentPlayingAudio = null;
-  }
-  const extPlayer = document.querySelector("#external-audio-player");
-  if (extPlayer) {
-    extPlayer.pause();
-    extPlayer.muted = true;
+  isMicPausedForListening = false;
+  if (!isHeadsetCoHostMode) {
+    isListeningRadio = false;
+    muteAllLocalAudioOutput();
   }
 
   setRadioButtonsAndStatus(
-    "🔇 Saída Mutada (Modo Locutor)",
+    "🔇 Alto-Falante Cortado (Modo Locutor)",
     true,
-    "Somente entrada de voz ativa neste aparelho (saída desligada para evitar retorno/eco).",
+    "Somente saída do Microfone ativa (o alto-falante deste aparelho está desligado para não dar eco).",
     null
   );
 
-  appState.radioLive = {
-    active: true,
-    title,
-    speakerName: currentUser.name,
-    speakerChurch: `${currentUser.church} (${ROLE_LABELS[currentUser.roleId]})`,
-    streamUrl,
-    updatedAt: Date.now(),
-  };
-  markCurrentItemsAsSeen();
-  await saveAppState();
+  await registerSpeakerInBancada(title, streamUrl);
   renderRadioPage();
 
   if (streamUrl) {
@@ -3241,43 +3375,62 @@ async function startMicrophoneBroadcast() {
   }
 
   try {
-    // 2. Ativa o microfone com Cancelamento de Eco e Supressão de Ruído nativos
+    // 2. Abre o microfone apenas para gravação/envio (nunca conectado ao alto-falante local!)
     micStream = await navigator.mediaDevices.getUserMedia({
       audio: {
         echoCancellation: true,
         noiseSuppression: true,
         autoGainControl: true,
+        channelCount: 1,
       },
       video: false,
     });
 
-    setRadioButtonsAndStatus(null, null, null, "🔴 MICROFONE NO AR (Somente Entrada)! Você pode minimizar o popup e navegar pelas abas.");
+    setRadioButtonsAndStatus(
+      null,
+      null,
+      null,
+      "🔴 MICROFONE NO AR (Só Envio / Alto-Falante Desligado)! Mais pessoas podem entrar na bancada junto com você."
+    );
 
     const recordAndSendChunk = () => {
-      if (!micStream || !isBroadcastingMic || !appState.radioLive?.active) return;
+      if (!micStream || !isBroadcastingMic || isMicPausedForListening) return;
       const recorder = new MediaRecorder(micStream);
       const chunks = [];
       recorder.ondataavailable = (e) => {
         if (e.data && e.data.size > 0) chunks.push(e.data);
       };
       recorder.onstop = () => {
-        if (!chunks.length || !isBroadcastingMic) return;
+        if (!chunks.length || !isBroadcastingMic || isMicPausedForListening) return;
         const blob = new Blob(chunks, { type: recorder.mimeType || "audio/webm" });
         const reader = new FileReader();
         reader.onloadend = async () => {
-          const endpoint = getCloudEndpoint("appigreja_radio_chunk");
-          if (!endpoint) return;
+          const payload = {
+            id: Date.now(),
+            deviceId: DEVICE_INSTANCE_ID,
+            speakerId: currentUser?.id || "",
+            speaker: currentUser?.name || "Locutor",
+            audioUrl: String(reader.result || ""),
+          };
           try {
-            await fetch(endpoint, {
-              method: "PUT",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                id: Date.now(),
-                deviceId: DEVICE_INSTANCE_ID,
-                speaker: currentUser.name,
-                audioUrl: String(reader.result || ""),
+            // Salva no canal individual deste locutor (permite vários locutores ao vivo ao mesmo tempo!) e no nó geral
+            await Promise.all([
+              fetch(getCloudEndpoint(`appigreja_radio_chunks/${DEVICE_INSTANCE_ID}`), {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
               }),
-            });
+              fetch(getCloudEndpoint("appigreja_radio_chunk"), {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+              }),
+              fetch(getCloudEndpoint(`appigreja_state/radioLive/speakers/${DEVICE_INSTANCE_ID}/lastActiveAt`), {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(Date.now()),
+              }),
+            ]);
           } catch (err) {
             console.warn("Falha no envio de chunk de áudio:", err);
           }
@@ -3295,12 +3448,51 @@ async function startMicrophoneBroadcast() {
     micRecorderInterval = setInterval(recordAndSendChunk, 2500);
   } catch (err) {
     isBroadcastingMic = false;
-    setRadioButtonsAndStatus(null, null, null, "Permissão de microfone negada no navegador. Libere o microfone no cadeado da barra de endereços!");
+    setRadioButtonsAndStatus(
+      null,
+      null,
+      null,
+      "Permissão de microfone negada no navegador. Libere o microfone no cadeado da barra de endereços!"
+    );
   }
+}
+
+// Permite a um locutor pausar o próprio microfone para ouvir outro co-locutor da bancada sem eco
+function togglePauseBroadcasterMic() {
+  if (!isBroadcastingMic) return;
+  isMicPausedForListening = !isMicPausedForListening;
+
+  if (micStream) {
+    micStream.getAudioTracks().forEach((track) => {
+      track.enabled = !isMicPausedForListening;
+    });
+  }
+
+  if (isMicPausedForListening) {
+    ensureCoHostListenerLoop();
+    setRadioButtonsAndStatus(
+      "🔊 Ouvindo outros locutores da bancada",
+      false,
+      "Seu microfone está pausado para você ouvir os outros locutores sem eco.",
+      "⏸️ Seu microfone está fechado. Você está ouvindo os outros integrantes da bancada."
+    );
+  } else {
+    if (!isHeadsetCoHostMode) {
+      muteAllLocalAudioOutput();
+    }
+    setRadioButtonsAndStatus(
+      "🔇 Alto-Falante Cortado (Modo Locutor)",
+      true,
+      "Microfone aberto enviando sua voz (alto-falante cortado para não dar eco).",
+      "🎙️ Microfone reaberto! Sua voz está sendo enviada ao vivo."
+    );
+  }
+  renderRadioPage();
 }
 
 async function stopBroadcast() {
   isBroadcastingMic = false;
+  isMicPausedForListening = false;
   if (micRecorderInterval) {
     clearInterval(micRecorderInterval);
     micRecorderInterval = null;
@@ -3310,37 +3502,142 @@ async function stopBroadcast() {
     micStream = null;
   }
 
-  // Limpa o último pacote de áudio da nuvem ao encerrar para ninguém ouvir sobra
-  const chunkEndpoint = getCloudEndpoint("appigreja_radio_chunk");
-  if (chunkEndpoint) {
-    fetch(chunkEndpoint, { method: "DELETE" }).catch(() => {});
+  // Remove apenas o canal de áudio deste locutor da bancada
+  try {
+    await fetch(getCloudEndpoint(`appigreja_radio_chunks/${DEVICE_INSTANCE_ID}`), { method: "DELETE" });
+  } catch {}
+
+  await syncFromCloud();
+  const currentSpeakers = { ...(appState.radioLive?.speakers || {}) };
+  delete currentSpeakers[DEVICE_INSTANCE_ID];
+  // Remove também entradas antigas inativas (> 60s)
+  const now = Date.now();
+  Object.keys(currentSpeakers).forEach((k) => {
+    if (currentSpeakers[k]?.lastActiveAt && now - Number(currentSpeakers[k].lastActiveAt) > 60000) {
+      delete currentSpeakers[k];
+    }
+  });
+
+  const remainingSpeakers = Object.values(currentSpeakers);
+
+  if (remainingSpeakers.length > 0) {
+    // Outros locutores continuam ao vivo na bancada!
+    appState.radioLive.speakers = currentSpeakers;
+    appState.radioLive.speakerName = remainingSpeakers.map((s) => s.name).join(" • ");
+    appState.radioLive.active = true;
+  } else {
+    // Era o último locutor: encerra a transmissão
+    fetch(getCloudEndpoint("appigreja_radio_chunk"), { method: "DELETE" }).catch(() => {});
+    appState.radioLive = {
+      active: false,
+      title: "",
+      speakerName: "",
+      speakerChurch: "",
+      streamUrl: "",
+      updatedAt: Date.now(),
+      speakers: {},
+    };
   }
 
-  appState.radioLive = {
-    active: false,
-    title: "",
-    speakerName: "",
-    speakerChurch: "",
-    streamUrl: "",
-    updatedAt: Date.now(),
-  };
   await saveAppState();
 
   setRadioButtonsAndStatus(
     "🔊 Conectar Áudio para Ouvir",
     false,
-    "Transmissão encerrada. Toque no botão amarelo se quiser ouvir outra pessoa.",
-    "⏹️ Transmissão encerrada e microfone desligado."
+    remainingSpeakers.length > 0
+      ? `Você saiu da bancada (${remainingSpeakers.length} locutor(es) continuam no ar). Toque acima se quiser ouvir.`
+      : "Transmissão encerrada. Toque no botão acima se quiser ouvir quando alguém entrar.",
+    "⏹️ Seu microfone foi desligado e você saiu da bancada ao vivo."
   );
   renderRadioPage();
 }
 
+function playNextQueuedAudioChunk() {
+  if (isPlayingQueueItem || !audioPlaybackQueue.length) return;
+  // Se este aparelho estiver com o microfone aberto falando e NÃO estiver no modo fone, corta o alto-falante imediatamente
+  if (isBroadcastingMic && !isMicPausedForListening && !isHeadsetCoHostMode) {
+    muteAllLocalAudioOutput();
+    return;
+  }
+
+  const nextChunk = audioPlaybackQueue.shift();
+  if (!nextChunk || !nextChunk.audioUrl) {
+    playNextQueuedAudioChunk();
+    return;
+  }
+
+  isPlayingQueueItem = true;
+  const audio = new Audio(nextChunk.audioUrl);
+  currentPlayingAudio = audio;
+  routeAudioToHeadsetIfAvailable(audio);
+
+  audio.onended = () => {
+    isPlayingQueueItem = false;
+    playNextQueuedAudioChunk();
+  };
+  audio.onerror = () => {
+    isPlayingQueueItem = false;
+    playNextQueuedAudioChunk();
+  };
+
+  audio.play().catch(() => {
+    isPlayingQueueItem = false;
+  });
+  setRadioButtonsAndStatus(null, null, `🔊 Ouvindo ao vivo: ${nextChunk.speaker || "Locutor"}`, null);
+}
+
+function ensureCoHostListenerLoop() {
+  if (!radioListenerInterval) {
+    startRadioPollingInterval();
+  }
+}
+
+function startRadioPollingInterval() {
+  if (radioListenerInterval) clearInterval(radioListenerInterval);
+  radioListenerInterval = setInterval(async () => {
+    const canHearNow =
+      (isListeningRadio && !isBroadcastingMic) ||
+      (isBroadcastingMic && (isMicPausedForListening || isHeadsetCoHostMode));
+
+    if (!canHearNow) return;
+
+    const multiEndpoint = getCloudEndpoint("appigreja_radio_chunks");
+    if (!multiEndpoint) return;
+
+    try {
+      const res = await fetch(multiEndpoint, { cache: "no-store" });
+      if (!res.ok) return;
+      const chunksMap = await res.json();
+      if (!chunksMap || typeof chunksMap !== "object") return;
+
+      const now = Date.now();
+      Object.values(chunksMap).forEach((chunk) => {
+        if (!chunk || !chunk.id || !chunk.audioUrl) return;
+        // TRAVA ABSOLUTA ANTI-ECO: Jamais reproduz a própria voz deste aparelho ou deste usuário!
+        if (chunk.deviceId === DEVICE_INSTANCE_ID) return;
+        if (currentUser && chunk.speakerId && chunk.speakerId === currentUser.id) return;
+
+        const devKey = chunk.deviceId || "default";
+        if (lastPlayedChunkByDevice[devKey] !== chunk.id && now - Number(chunk.id) < 15000) {
+          lastPlayedChunkByDevice[devKey] = chunk.id;
+          audioPlaybackQueue.push(chunk);
+        }
+      });
+
+      playNextQueuedAudioChunk();
+    } catch {
+      // ignora oscilações de rede
+    }
+  }, 1500);
+}
+
 function startListeningRadioLoop() {
-  if (isBroadcastingMic) {
+  // Se este aparelho estiver com o microfone aberto falando (sem modo fone), mantém alto-falante bloqueado
+  if (isBroadcastingMic && !isMicPausedForListening && !isHeadsetCoHostMode) {
     setRadioButtonsAndStatus(
       null,
       null,
-      "🔇 Você está transmitindo neste aparelho! A saída de som fica desligada aqui para evitar retorno.",
+      "🔇 Seu microfone está aberto enviando voz! O alto-falante fica desligado aqui para nunca dar eco.",
       null
     );
     return;
@@ -3350,17 +3647,13 @@ function startListeningRadioLoop() {
   const extPlayer = document.querySelector("#popup-external-audio-player") || document.querySelector("#external-audio-player");
 
   if (!isListeningRadio) {
-    if (currentPlayingAudio) {
-      currentPlayingAudio.pause();
-      currentPlayingAudio = null;
-    }
-    if (extPlayer) extPlayer.pause();
+    muteAllLocalAudioOutput();
     setRadioButtonsAndStatus("🔊 Conectar Áudio para Ouvir", false, "🔇 Áudio silenciado neste aparelho.", null);
     renderRadioPage();
     return;
   }
 
-  setRadioButtonsAndStatus("🔇 Silenciar Rádio neste Aparelho", false, "✅ Sintonizado! Você pode trocar de aba livremente.", null);
+  setRadioButtonsAndStatus("🔇 Silenciar Rádio neste Aparelho", false, "✅ Sintonizado na Bancada Ao Vivo!", null);
   renderRadioPage();
 
   if (extPlayer && appState.radioLive?.streamUrl) {
@@ -3368,34 +3661,7 @@ function startListeningRadioLoop() {
     extPlayer.play().catch(() => {});
   }
 
-  if (radioListenerInterval) clearInterval(radioListenerInterval);
-  radioListenerInterval = setInterval(async () => {
-    if (!isListeningRadio || isBroadcastingMic) return;
-
-    const endpoint = getCloudEndpoint("appigreja_radio_chunk");
-    if (!endpoint) return;
-    try {
-      const res = await fetch(endpoint, { cache: "no-store" });
-      if (!res.ok) return;
-      const chunk = await res.json();
-
-      if (!chunk || !chunk.id || chunk.deviceId === DEVICE_INSTANCE_ID) return;
-
-      if (chunk.id !== lastPlayedChunkId && Date.now() - chunk.id < 15000) {
-        lastPlayedChunkId = chunk.id;
-        if (chunk.audioUrl && !isBroadcastingMic) {
-          if (currentPlayingAudio) {
-            currentPlayingAudio.pause();
-          }
-          currentPlayingAudio = new Audio(chunk.audioUrl);
-          currentPlayingAudio.play().catch(() => {});
-          setRadioButtonsAndStatus(null, null, `🔊 Ouvindo ao vivo: ${chunk.speaker || "Locutor"}`, null);
-        }
-      }
-    } catch {
-      // ignora oscilações de rede
-    }
-  }, 1800);
+  startRadioPollingInterval();
 }
 
 function renderVisitUserFields() {
